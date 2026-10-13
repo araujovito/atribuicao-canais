@@ -12,7 +12,7 @@ os.environ["ATRIBUICAO_TOKEN_ADMIN"] = "token-de-teste"
 import pytest
 from fastapi.testclient import TestClient
 
-from app import main
+from app import limite, main
 from app.banco import conectar
 
 
@@ -35,6 +35,7 @@ def cliente():
         for tabela in ("eventos", "vinculos", "consentimentos"):
             con.execute(f"DELETE FROM {tabela}")
     con.close()
+    limite.zerar()
     with TestClient(main.app) as c:
         yield c
 
@@ -154,3 +155,35 @@ def test_retencao_exige_token_e_nao_esvazia_o_banco(cliente):
     assert cliente.post("/api/retencao?dias=0", headers=ADMIN).status_code == 422
     assert cliente.post("/api/retencao?dias=30", headers=ADMIN).json()["eventos_apagados"] == 0
     assert consultar("SELECT COUNT(*) FROM eventos")[0][0] == 1
+
+
+def test_limite_de_eventos_por_ip(cliente):
+    aceitar(cliente, "aparelho-1")
+    codigos = [cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "visita"}).status_code
+               for _ in range(61)]
+    assert codigos[:60] == [200] * 60
+    assert codigos[60] == 429
+    assert consultar("SELECT COUNT(*) FROM eventos")[0][0] == 60
+
+
+def test_limite_de_pedidos_de_exclusao(cliente, monkeypatch):
+    monkeypatch.setattr(main.correio, "enviar", lambda *a: None)
+    codigos = [cliente.post("/api/titular/pedido", json={"email": f"x{i}@exemplo.com"}).status_code for i in range(6)]
+    assert codigos == [200] * 5 + [429]
+
+
+def test_anon_id_com_caracteres_estranhos(cliente):
+    r = cliente.post("/api/consentimento", json={"anon_id": "<script>alert(1)</script>", "aceito": True, "versao": "v1"})
+    assert r.status_code == 422
+
+
+def test_atras_de_proxy_vale_o_ip_que_o_proxy_acrescentou(cliente, monkeypatch):
+    monkeypatch.setattr(limite, "ATRAS_DE_PROXY", True)
+    aceitar(cliente, "aparelho-1")
+    # O cliente forja o primeiro endereço a cada requisição; o último é do proxy.
+    codigos = [
+        cliente.post("/api/evento", headers={"x-forwarded-for": f"10.0.0.{i}, 200.1.1.1"},
+                     json={"anon_id": "aparelho-1", "tipo": "visita"}).status_code
+        for i in range(61)
+    ]
+    assert codigos[60] == 429

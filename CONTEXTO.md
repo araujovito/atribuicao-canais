@@ -19,7 +19,7 @@ Uso: projeto de portfólio pessoal. Não usa dados reais de ninguém.
 | 1 | Análise de site (web analytics) | visitas, páginas, origem, celular x computador | feito (código por e-mail) |
 | 2 | Rastreamento por UTM | saber qual link/campanha trouxe a visita | feito (token + piso de 30 dias) |
 | 3 | Junção de identidade entre aparelhos | mesma pessoa no celular e no computador | feito (`app/acesso.py`) |
-| 4 | Atribuição multicanal | quanto crédito cada canal recebe pela conversão | GA4, Triple Whale, Northbeam, Hyros |
+| 4 | Atribuição multicanal | quanto crédito cada canal recebe pela conversão | feito (`app/limite.py`) |
 | 5 | Análise de produto (funis, retenção) | onde as pessoas desistem no caminho | Mixpanel, Amplitude, Heap |
 | 6 | Gravação de sessão e mapa de cliques | ver o que a pessoa fez na tela | Hotjar, Microsoft Clarity, FullStory |
 | 7 | Coleta e distribuição de eventos (CDP) | coletar uma vez e mandar para vários destinos | Segment, mParticle |
@@ -112,6 +112,11 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Item 4: limite por IP em memória (60 eventos/min,
+  5 pedidos de exclusão/hora, 10 confirmações/hora, 20 consentimentos e
+  identificações/min). IP só em memória. Atrás de proxy, vale o último
+  endereço do X-Forwarded-For. anon_id restrito a letras, dígitos e hífen.
 
 - **2026-10-13** — Item 1: exclusão em dois passos. Código de 6 dígitos
   enviado ao e-mail (simulado no log, `app/correio.py`), gravado só como

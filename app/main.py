@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field
 
 from app import correio, privacidade, tempo
 from app.acesso import exigir_admin
+from app.limite import limitar
 from app.atribuicao import NOMES, comparar
 from app.banco import conectar
 from app.canais import CANAIS, classificar
@@ -90,14 +91,19 @@ def tem_consentimento(con: sqlite3.Connection, anon_id: str) -> bool:
     return bool(linha and linha["aceito"])
 
 
+# UUID do navegador (ou o identificador de reserva do rastreio.js): letras,
+# dígitos e hífen. Recusa texto arbitrário que alguém tente usar como id.
+ANON_ID = r"^[A-Za-z0-9-]{8,64}$"
+
+
 class Consentimento(BaseModel):
-    anon_id: str = Field(min_length=8, max_length=64)
+    anon_id: str = Field(pattern=ANON_ID)
     aceito: bool
     versao: str = Field(max_length=20)
 
 
 class Evento(BaseModel):
-    anon_id: str = Field(min_length=8, max_length=64)
+    anon_id: str = Field(pattern=ANON_ID)
     tipo: str = Field(pattern="^(visita|conversao)$")
     host: str | None = None
     referrer: str | None = None
@@ -105,12 +111,12 @@ class Evento(BaseModel):
     utm_medium: str | None = None
     utm_campaign: str | None = None
     gclid: str | None = None
-    valor: float = Field(default=0, ge=0)
+    valor: float = Field(default=0, ge=0, le=1_000_000)
     email: str | None = Field(default=None, max_length=254)
 
 
 class Identificacao(BaseModel):
-    anon_id: str = Field(min_length=8, max_length=64)
+    anon_id: str = Field(pattern=ANON_ID)
     email: str = Field(min_length=3, max_length=254)
 
 
@@ -129,7 +135,7 @@ def vincular(con: sqlite3.Connection, anon_id: str, email: str) -> str:
     return pid
 
 
-@app.post("/api/consentimento")
+@app.post("/api/consentimento", dependencies=[Depends(limitar("consentimento", 20, 60))])
 def registrar_consentimento(c: Consentimento, con: sqlite3.Connection = Banco):
     with con:
         con.execute(
@@ -139,7 +145,7 @@ def registrar_consentimento(c: Consentimento, con: sqlite3.Connection = Banco):
     return {"ok": True}
 
 
-@app.post("/api/evento")
+@app.post("/api/evento", dependencies=[Depends(limitar("evento", 60, 60))])
 def registrar_evento(ev: Evento, request: Request, con: sqlite3.Connection = Banco):
     if not tem_consentimento(con, ev.anon_id):
         raise HTTPException(403, "sem consentimento registrado para este aparelho")
@@ -162,7 +168,7 @@ def registrar_evento(ev: Evento, request: Request, con: sqlite3.Connection = Ban
     return {"ok": True, "canal": canal}
 
 
-@app.post("/api/identificar")
+@app.post("/api/identificar", dependencies=[Depends(limitar("identificar", 20, 60))])
 def identificar(i: Identificacao, con: sqlite3.Connection = Banco):
     if not tem_consentimento(con, i.anon_id):
         raise HTTPException(403, "sem consentimento registrado para este aparelho")
@@ -203,7 +209,7 @@ def painel(janela_dias: int = JANELA_DIAS, con: sqlite3.Connection = Banco):
     }
 
 
-@app.post("/api/titular/pedido")
+@app.post("/api/titular/pedido", dependencies=[Depends(limitar("pedido_exclusao", 5, 3600))])
 def pedir_exclusao(t: Titular, con: sqlite3.Connection = Banco):
     codigo = privacidade.pedir_exclusao(con, t.email)
     correio.enviar(t.email, "Código para excluir seus dados",
@@ -212,7 +218,7 @@ def pedir_exclusao(t: Titular, con: sqlite3.Connection = Banco):
     return {"ok": True, "mensagem": "Se houver dados ligados a este e-mail, enviamos um código."}
 
 
-@app.delete("/api/titular")
+@app.delete("/api/titular", dependencies=[Depends(limitar("confirma_exclusao", 10, 3600))])
 def excluir(c: Confirmacao, con: sqlite3.Connection = Banco):
     apagados = privacidade.confirmar_exclusao(con, c.email, c.codigo)
     if apagados is None:
