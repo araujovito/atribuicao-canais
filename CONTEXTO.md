@@ -52,10 +52,10 @@ têm partes com licenças que restringem oferecer o produto como serviço a terc
 
 | Serviço | Onde | Status |
 |---|---|---|
-| 1, 2 Coleta de visitas e UTMs | `web/rastreio.js`, `app/main.py`, `app/canais.py` | em andamento: API e canais feitos, falta `rastreio.js` |
+| 1, 2 Coleta de visitas e UTMs | `web/rastreio.js`, `app/main.py`, `app/canais.py` | feito |
 | 3 Junção de identidade entre aparelhos | `app/identidade.py` | feito |
 | 4 Atribuição (5 modelos de regra + Markov) | `app/atribuicao.py` | feito |
-| 11 Consentimento + privacidade (HMAC, exclusão, retenção) | `web/loja.html`, `app/privacidade.py`, `app/banco.py`, `app/main.py` | em andamento: servidor feito, falta o banner em `loja.html` |
+| 11 Consentimento + privacidade (HMAC, exclusão, retenção) | `web/loja.html`, `app/privacidade.py`, `app/banco.py`, `app/main.py` | feito |
 | Montagem das jornadas (janela de 30 dias) | `app/jornadas.py` | feito |
 | Painel comparando modelos | `web/index.html` | a fazer (API `/api/painel` pronta) |
 | Dados fictícios para demonstração | `scripts/gerar_dados.py` | a fazer |
@@ -81,6 +81,13 @@ cima.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Rastreador (`web/rastreio.js`) e loja de demonstração
+  (`web/loja.html`) com banner de consentimento, login, compra, revogação e
+  exclusão. Só a visita de entrada de cada sessão sai do navegador.
+  Conferido em Chromium headless: anúncio no celular + compra no computador
+  com o mesmo e-mail = 1 conversão entre aparelhos, creditada a Busca paga
+  (Direto sem a junção); recusa no banner não envia nada.
 
 - **2026-10-13** — API (`app/main.py`, FastAPI) e montagem das jornadas
   (`app/jornadas.py`). O servidor confere o consentimento de novo e recusa

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torra Fictícia — loja de demonstração</title>
+<style>
+  :root {
+    --fundo: #faf7f2; --texto: #2b2420; --suave: #6f6259; --borda: #e4dcd2;
+    --cartao: #ffffff; --acento: #8a4b2a; --acento-texto: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fundo: #1c1916; --texto: #eee6dd; --suave: #b0a296; --borda: #3a332d;
+      --cartao: #25211d; --acento: #d08a5c; --acento-texto: #1c1916;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 16px/1.5 system-ui, sans-serif; background: var(--fundo); color: var(--texto); }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 140px; }
+  h1 { margin: 0 0 4px; font-size: 1.6rem; }
+  .aviso { color: var(--suave); margin: 0 0 24px; font-size: .9rem; }
+  .grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .cartao { background: var(--cartao); border: 1px solid var(--borda); border-radius: 10px; padding: 16px; }
+  .cartao h2 { font-size: 1.05rem; margin: 0 0 8px; }
+  .preco { font-weight: 600; font-size: 1.2rem; margin: 4px 0 12px; }
+  button, .botao {
+    font: inherit; cursor: pointer; border-radius: 8px; padding: 8px 14px;
+    border: 1px solid var(--acento); background: var(--acento); color: var(--acento-texto); text-decoration: none; display: inline-block;
+  }
+  button.secundario, .botao.secundario { background: transparent; color: var(--acento); }
+  input { font: inherit; padding: 8px; border-radius: 8px; border: 1px solid var(--borda); background: var(--fundo); color: var(--texto); width: 100%; }
+  section { margin-top: 28px; }
+  .origens { display: flex; flex-wrap: wrap; gap: 8px; }
+  .linha { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .linha input { flex: 1 1 220px; width: auto; }
+  #estado { font-family: ui-monospace, monospace; font-size: .85rem; color: var(--suave); word-break: break-all; }
+  #banner {
+    position: fixed; left: 0; right: 0; bottom: 0; background: var(--cartao); border-top: 1px solid var(--borda);
+    padding: 16px; box-shadow: 0 -4px 16px rgba(0,0,0,.08);
+  }
+  #banner .conteudo { max-width: 860px; margin: 0 auto; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+  #banner p { margin: 0; flex: 1 1 320px; font-size: .92rem; }
+  #banner .acoes { display: flex; gap: 8px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Torra Fictícia</h1>
+  <p class="aviso">Loja de demonstração: nada aqui é vendido de verdade e nenhum dado sai deste servidor.
+    Abra no celular e no computador com o mesmo e-mail para ver a junção entre aparelhos no <a href="/">painel</a>.</p>
+
+  <section>
+    <h2>1. Chegar por um canal</h2>
+    <p class="aviso">Simula a origem da visita. Cada link abre uma nova sessão com a UTM correspondente.</p>
+    <div class="origens" id="origens"></div>
+  </section>
+
+  <section>
+    <h2>2. Entrar (junta este aparelho à sua pessoa)</h2>
+    <form class="linha" id="form-login">
+      <input type="email" id="email" placeholder="voce@exemplo.com" required>
+      <button>Entrar</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>3. Comprar</h2>
+    <div class="grade" id="produtos"></div>
+  </section>
+
+  <section>
+    <h2>Seus dados</h2>
+    <div class="linha">
+      <button class="secundario" id="revogar">Retirar consentimento</button>
+      <button class="secundario" id="excluir">Excluir meus dados</button>
+    </div>
+    <p id="estado"></p>
+  </section>
+</main>
+
+<div id="banner" hidden>
+  <div class="conteudo">
+    <p>Usamos um identificador neste aparelho para saber por qual canal você chegou e, se você entrar com
+      seu e-mail, ligar suas visitas no celular e no computador. O e-mail é guardado só como código
+      irreversível sem a nossa chave. Os dados são apagados em 13 meses ou quando você pedir.</p>
+    <div class="acoes">
+      <button class="secundario" id="recusar">Recusar</button>
+      <button id="aceitar">Aceitar</button>
+    </div>
+  </div>
+</div>
+
+<script src="/web/rastreio.js"></script>
+<script>
+  var ORIGENS = [
+    ["Google Ads", "utm_source=google&utm_medium=cpc&utm_campaign=cafes-especiais"],
+    ["Instagram pago", "utm_source=instagram&utm_medium=paid&utm_campaign=lancamento"],
+    ["Newsletter", "utm_source=newsletter&utm_medium=email&utm_campaign=semanal"],
+    ["Post no Facebook", "utm_source=facebook&utm_medium=social"],
+    ["Afiliado", "utm_source=blog-do-cafe&utm_medium=afiliado"],
+    ["Direto", ""],
+  ];
+  var PRODUTOS = [["Café da Serra, 250 g", 39.9], ["Kit degustação", 129.0], ["Moedor manual", 249.0]];
+
+  var origens = document.getElementById("origens");
+  ORIGENS.forEach(function (o) {
+    var a = document.createElement("a");
+    a.className = "botao secundario";
+    a.textContent = o[0];
+    a.href = "/loja" + (o[1] ? "?" + o[1] : "");
+    // Nova sessão: o rastreador só envia a visita de entrada de cada sessão.
+    a.addEventListener("click", function () { try { sessionStorage.clear(); } catch (e) {} });
+    origens.appendChild(a);
+  });
+
+  var produtos = document.getElementById("produtos");
+  PRODUTOS.forEach(function (p) {
+    var c = document.createElement("div");
+    c.className = "cartao";
+    c.innerHTML = "<h2></h2><div class='preco'></div><button>Comprar</button>";
+    c.querySelector("h2").textContent = p[0];
+    c.querySelector(".preco").textContent = p[1].toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    c.querySelector("button").addEventListener("click", function () {
+      var email = document.getElementById("email").value || null;
+      Rastreio.converter(p[1], email).then(function (r) { mostrar(r ? "Compra registrada." : "Compra feita, mas sem rastreio (sem consentimento)."); });
+    });
+    produtos.appendChild(c);
+  });
+
+  function mostrar(msg) {
+    var e = Rastreio.estado();
+    document.getElementById("estado").textContent =
+      (msg ? msg + " · " : "") + "consentimento: " + e.consentimento + (e.anon_id ? " · aparelho: " + e.anon_id : "");
+    document.getElementById("banner").hidden = e.consentimento !== "pendente";
+  }
+
+  document.getElementById("aceitar").onclick = function () { Rastreio.aceitar().then(function () { mostrar(); }); };
+  document.getElementById("recusar").onclick = function () { Rastreio.recusar().then(function () { mostrar(); }); };
+  document.getElementById("revogar").onclick = function () { Rastreio.revogar().then(function () { mostrar("Consentimento retirado."); }); };
+  document.getElementById("excluir").onclick = function () {
+    var email = document.getElementById("email").value;
+    if (!email) { mostrar("Informe o e-mail usado para excluir."); return; }
+    Rastreio.excluirMeusDados(email).then(function (r) {
+      var a = r.apagados;
+      mostrar("Apagados: " + a.eventos_identificados + " eventos identificados, " + a.eventos_anonimos + " anônimos, " + a.vinculos + " vínculos.");
+    });
+  };
+  document.getElementById("form-login").onsubmit = function (ev) {
+    ev.preventDefault();
+    Rastreio.identificar(document.getElementById("email").value).then(function (r) {
+      mostrar(r ? "Aparelho ligado ao seu e-mail." : "Sem consentimento: nada foi ligado.");
+    });
+  };
+  mostrar();
+</script>
+</body>
+</html>
