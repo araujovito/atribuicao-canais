@@ -67,6 +67,32 @@ não reconstruí-los inteiros. Num ambiente real, a coleta poderia ir para o
 RudderStack e a análise para o PostHog, e a lógica de atribuição daqui ficaria por
 cima.
 
+## Lista de melhorias (2026-10-13)
+
+Levantada depois da primeira versão. Cada item sai num commit próprio (ou
+em par, quando dois mexem no mesmo código), e o status é atualizado junto.
+
+| # | Item | Status |
+|---|---|---|
+| 1 | Exclusão a pedido sem confirmar identidade: qualquer um apaga dados de qualquer e-mail | a fazer |
+| 2 | `POST /api/retencao?dias=0` aberto apaga o banco inteiro | a fazer |
+| 3 | Painel e API de análise sem autenticação | a fazer |
+| 4 | Sem limite de requisições: dá para encher o banco de eventos falsos | a fazer |
+| 5 | Funis (visita → login → carrinho → compra) por canal | a fazer |
+| 6 | Publicação online (Render/Railway) | a fazer |
+| 7 | Repositório no GitHub + testes no CI | a fazer |
+| 8 | Teste de incrementalidade (grupo de controle) contra os modelos | a fazer |
+| 9 | Markov de 1ª ordem não lembra a origem | a fazer |
+| 10 | Créditos sem margem de erro | a fazer |
+| 11 | Modelos não comparados com a verdade conhecida do gerador | a fazer |
+| 12 | Uma conexão SQLite compartilhada entre requisições | a fazer |
+| 13 | Painel recalcula tudo a cada acesso | a fazer |
+| 14 | Datas sem fuso horário | a fazer |
+| 15 | Rastreador só funciona no mesmo domínio (sem CORS) | a fazer |
+| 16 | `gerar_dados.py` apaga o banco sem perguntar | a fazer |
+| 17 | README sem imagem do painel e sem licença | a fazer |
+| 18 | Consentimento único, sem finalidades separadas nem política de privacidade | a fazer |
+
 ## Decisões e limites
 
 - **Sem login ou formulário, não há junção confiável entre aparelhos.** O que
@@ -86,6 +112,9 @@ cima.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Lista de 18 melhorias registrada (seção própria), com
+  as falhas de segurança primeiro.
 
 - **2026-10-13** — README para quem chega sem contexto: como rodar,
   arquitetura, decisões, o que os dados fictícios mostram e limites.
