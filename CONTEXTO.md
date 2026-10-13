@@ -16,7 +16,7 @@ Uso: projeto de portfólio pessoal. Não usa dados reais de ninguém.
 
 | # | Serviço | O que resolve | Quem vende (exemplos) |
 |---|---|---|---|
-| 1 | Análise de site (web analytics) | visitas, páginas, origem, celular x computador | Google Analytics 4, Adobe Analytics |
+| 1 | Análise de site (web analytics) | visitas, páginas, origem, celular x computador | feito (código por e-mail) |
 | 2 | Rastreamento por UTM | saber qual link/campanha trouxe a visita | feito (token + piso de 30 dias) |
 | 3 | Junção de identidade entre aparelhos | mesma pessoa no celular e no computador | feito (`app/acesso.py`) |
 | 4 | Atribuição multicanal | quanto crédito cada canal recebe pela conversão | GA4, Triple Whale, Northbeam, Hyros |
@@ -112,6 +112,12 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Item 1: exclusão em dois passos. Código de 6 dígitos
+  enviado ao e-mail (simulado no log, `app/correio.py`), gravado só como
+  HMAC, vence em 15 min, queima após 5 erros, uso único. Resposta igual
+  exista ou não o e-mail. Rota de atendimento com token para pedidos por
+  outros canais. Fluxo conferido na loja em Chromium headless.
 
 - **2026-10-13** — Itens 2 e 3: painel e retenção exigem token de
   administrador (`ATRIBUICAO_TOKEN_ADMIN`; sem ele, sorteado na subida e

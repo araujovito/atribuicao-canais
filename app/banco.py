@@ -54,6 +54,16 @@ CREATE TABLE IF NOT EXISTS consentimentos (
     momento TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS consentimentos_anon ON consentimentos (anon_id);
+
+-- Pedido de exclusão aguardando confirmação pelo código enviado ao e-mail.
+-- Guarda o HMAC do código, nunca o código; expira em 15 minutos e aceita
+-- no máximo 5 tentativas.
+CREATE TABLE IF NOT EXISTS pedidos_exclusao (
+    pessoa_id   TEXT PRIMARY KEY,
+    codigo_hash TEXT NOT NULL,
+    expira      TEXT NOT NULL,
+    tentativas  INTEGER NOT NULL DEFAULT 0
+);
 """
 
 

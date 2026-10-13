@@ -89,12 +89,43 @@ def test_jornada_celular_para_computador(cliente):
     assert p["sem_juncao"]["ultimo_toque"]["receita"] == {"Direto": 200.0}
 
 
-def test_exclusao_pela_api(cliente):
+def test_exclusao_exige_codigo_do_email(cliente, monkeypatch):
+    enviados = []
+    monkeypatch.setattr(main.correio, "enviar", lambda para, assunto, corpo: enviados.append((para, corpo)))
     aceitar(cliente, "celular-ana")
     cliente.post("/api/evento", json={"anon_id": "celular-ana", "tipo": "visita", "email": "ana@exemplo.com"})
-    r = cliente.request("DELETE", "/api/titular", json={"email": "ana@exemplo.com"})
+
+    # Sem código, ou com código inventado, nada é apagado.
+    assert cliente.request("DELETE", "/api/titular", json={"email": "ana@exemplo.com"}).status_code == 422
+    r = cliente.request("DELETE", "/api/titular", json={"email": "ana@exemplo.com", "codigo": "123456"})
+    assert r.status_code == 403
+
+    cliente.post("/api/titular/pedido", json={"email": "ana@exemplo.com"})
+    para, corpo = enviados[-1]
+    codigo = next(p for p in corpo.split() if p.isdigit() and len(p) == 6)
+    assert para == "ana@exemplo.com"
+    r = cliente.request("DELETE", "/api/titular", json={"email": "ana@exemplo.com", "codigo": codigo})
     assert r.json()["apagados"]["eventos_identificados"] == 1
     assert consultar("SELECT COUNT(*) FROM eventos")[0][0] == 0
+    # Código é de uso único.
+    assert cliente.request("DELETE", "/api/titular", json={"email": "ana@exemplo.com", "codigo": codigo}).status_code == 403
+
+
+def test_pedido_nao_revela_se_email_existe(cliente, monkeypatch):
+    monkeypatch.setattr(main.correio, "enviar", lambda *a: None)
+    aceitar(cliente, "celular-ana")
+    cliente.post("/api/evento", json={"anon_id": "celular-ana", "tipo": "visita", "email": "ana@exemplo.com"})
+    com = cliente.post("/api/titular/pedido", json={"email": "ana@exemplo.com"}).json()
+    sem = cliente.post("/api/titular/pedido", json={"email": "ninguem@exemplo.com"}).json()
+    assert com == sem
+
+
+def test_exclusao_pelo_atendimento_exige_token(cliente):
+    aceitar(cliente, "celular-ana")
+    cliente.post("/api/evento", json={"anon_id": "celular-ana", "tipo": "visita", "email": "ana@exemplo.com"})
+    assert cliente.request("DELETE", "/api/admin/titular", json={"email": "ana@exemplo.com"}).status_code == 401
+    r = cliente.request("DELETE", "/api/admin/titular", headers=ADMIN, json={"email": "ana@exemplo.com"})
+    assert r.json()["apagados"]["eventos_identificados"] == 1
 
 
 def test_requisicoes_simultaneas(cliente):

@@ -5,7 +5,9 @@ Rotas:
     POST   /api/evento          visita de entrada ou conversão; exige consentimento
     POST   /api/identificar     login/formulário: liga o aparelho ao pseudônimo
     GET    /api/painel          atribuição por modelo, com e sem junção [admin]
-    DELETE /api/titular         exclusão a pedido (LGPD art. 18)
+    POST   /api/titular/pedido  pede exclusão: envia código ao e-mail (LGPD art. 18)
+    DELETE /api/titular         confirma a exclusão com o código
+    DELETE /api/admin/titular   exclusão feita pelo atendimento [admin]
     POST   /api/retencao        aplica o prazo de retenção, mínimo 30 dias [admin]
     GET    /, /loja             painel e loja de demonstração
 
@@ -30,7 +32,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import privacidade, tempo
+from app import correio, privacidade, tempo
 from app.acesso import exigir_admin
 from app.atribuicao import NOMES, comparar
 from app.banco import conectar
@@ -116,6 +118,10 @@ class Titular(BaseModel):
     email: str = Field(min_length=3, max_length=254)
 
 
+class Confirmacao(Titular):
+    codigo: str = Field(pattern=r"^\s*\d{6}\s*$")
+
+
 def vincular(con: sqlite3.Connection, anon_id: str, email: str) -> str:
     pid = privacidade.pseudonimo(email)
     with con:
@@ -197,8 +203,27 @@ def painel(janela_dias: int = JANELA_DIAS, con: sqlite3.Connection = Banco):
     }
 
 
+@app.post("/api/titular/pedido")
+def pedir_exclusao(t: Titular, con: sqlite3.Connection = Banco):
+    codigo = privacidade.pedir_exclusao(con, t.email)
+    correio.enviar(t.email, "Código para excluir seus dados",
+                   f"Use o código {codigo} em até {privacidade.CODIGO_MINUTOS} minutos.")
+    # Mesma resposta exista ou não dado ligado ao e-mail.
+    return {"ok": True, "mensagem": "Se houver dados ligados a este e-mail, enviamos um código."}
+
+
 @app.delete("/api/titular")
-def excluir(t: Titular, con: sqlite3.Connection = Banco):
+def excluir(c: Confirmacao, con: sqlite3.Connection = Banco):
+    apagados = privacidade.confirmar_exclusao(con, c.email, c.codigo)
+    if apagados is None:
+        raise HTTPException(403, "código inválido, vencido ou com tentativas esgotadas")
+    return {"ok": True, "apagados": apagados}
+
+
+@app.delete("/api/admin/titular", dependencies=Admin)
+def excluir_pelo_atendimento(t: Titular, con: sqlite3.Connection = Banco):
+    """Para pedidos que chegam por outro canal (SAC, e-mail ao encarregado),
+    em que a identidade já foi conferida por quem atende."""
     return {"ok": True, "apagados": privacidade.excluir_titular(con, t.email)}
 
 

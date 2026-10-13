@@ -76,6 +76,10 @@
       <button class="secundario" id="revogar">Retirar consentimento</button>
       <button class="secundario" id="excluir">Excluir meus dados</button>
     </div>
+    <form class="linha" id="form-codigo" hidden style="margin-top: 12px">
+      <input id="codigo" inputmode="numeric" pattern="\d{6}" maxlength="6" placeholder="código de 6 dígitos" required>
+      <button>Confirmar exclusão</button>
+    </form>
     <p id="estado"></p>
   </section>
 </main>
@@ -142,10 +146,19 @@
   document.getElementById("excluir").onclick = function () {
     var email = document.getElementById("email").value;
     if (!email) { mostrar("Informe o e-mail usado para excluir."); return; }
-    Rastreio.excluirMeusDados(email).then(function (r) {
-      var a = r.apagados;
-      mostrar("Apagados: " + a.eventos_identificados + " eventos identificados, " + a.eventos_anonimos + " anônimos, " + a.vinculos + " vínculos.");
+    Rastreio.pedirExclusao(email).then(function (r) {
+      document.getElementById("form-codigo").hidden = false;
+      mostrar(r.mensagem + " (Neste protótipo, o e-mail aparece no log do servidor.)");
     });
+  };
+  document.getElementById("form-codigo").onsubmit = function (ev) {
+    ev.preventDefault();
+    var email = document.getElementById("email").value;
+    Rastreio.excluirMeusDados(email, document.getElementById("codigo").value).then(function (r) {
+      var a = r.apagados;
+      document.getElementById("form-codigo").hidden = true;
+      mostrar("Apagados: " + a.eventos_identificados + " eventos identificados, " + a.eventos_anonimos + " anônimos, " + a.vinculos + " vínculos.");
+    }, function () { mostrar("Código inválido, vencido ou com tentativas esgotadas."); });
   };
   document.getElementById("form-login").onsubmit = function (ev) {
     ev.preventDefault();

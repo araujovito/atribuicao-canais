@@ -14,6 +14,7 @@
  *   Rastreio.aceitar() / Rastreio.recusar() / Rastreio.revogar()
  *   Rastreio.identificar(email)       (login ou formulário)
  *   Rastreio.converter(valor, email)  (compra)
+ *   Rastreio.pedirExclusao(email) e Rastreio.excluirMeusDados(email, codigo)
  */
 (function () {
   "use strict";
@@ -105,8 +106,14 @@
       return enviar("/api/evento", { anon_id: anonId(), tipo: "conversao", valor: valor, email: email || null });
     },
 
-    excluirMeusDados: function (email) {
-      return enviar("/api/titular", { email: email }, "DELETE").then(function (r) {
+    // Exclusão em dois passos: o código vai para o e-mail, e só quem lê
+    // aquela caixa de entrada consegue apagar os dados ligados a ele.
+    pedirExclusao: function (email) {
+      return enviar("/api/titular/pedido", { email: email });
+    },
+
+    excluirMeusDados: function (email, codigo) {
+      return enviar("/api/titular", { email: email, codigo: codigo }, "DELETE").then(function (r) {
         return Rastreio.revogar().then(function () { return r; });
       });
     },

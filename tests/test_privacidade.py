@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from app.banco import conectar
-from app.privacidade import aplicar_retencao, excluir_titular, pseudonimo
+from app.privacidade import aplicar_retencao, confirmar_exclusao, excluir_titular, pedir_exclusao, pseudonimo
 from app.tempo import texto
 
 CHAVE = b"chave-de-teste"
@@ -81,3 +81,22 @@ def test_retencao(con):
     assert contar(con) == 1 and contar(con, "vinculos") == 0
     # O consentimento de "novo" fica: ainda há evento coletado com base nele.
     assert [r[0] for r in con.execute("SELECT anon_id FROM consentimentos")] == ["novo"]
+
+
+def test_codigo_vence_em_15_minutos(con):
+    codigo = pedir_exclusao(con, "ana@exemplo.com", agora=AGORA, chave_hmac=CHAVE)
+    depois = AGORA + timedelta(minutes=16)
+    assert confirmar_exclusao(con, "ana@exemplo.com", codigo, agora=depois, chave_hmac=CHAVE) is None
+
+
+def test_cinco_tentativas_erradas_queimam_o_codigo(con):
+    codigo = pedir_exclusao(con, "ana@exemplo.com", agora=AGORA, chave_hmac=CHAVE)
+    errado = "000000" if codigo != "000000" else "111111"
+    for _ in range(5):
+        assert confirmar_exclusao(con, "ana@exemplo.com", errado, agora=AGORA, chave_hmac=CHAVE) is None
+    assert confirmar_exclusao(con, "ana@exemplo.com", codigo, agora=AGORA, chave_hmac=CHAVE) is None
+
+
+def test_codigo_nao_fica_gravado(con):
+    codigo = pedir_exclusao(con, "ana@exemplo.com", agora=AGORA, chave_hmac=CHAVE)
+    assert codigo not in str([tuple(r) for r in con.execute("SELECT * FROM pedidos_exclusao")])

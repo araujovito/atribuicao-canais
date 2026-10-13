@@ -22,6 +22,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
+import secrets
 import sqlite3
 import warnings
 from datetime import datetime, timedelta
@@ -48,6 +49,57 @@ def normalizar_email(email: str) -> str:
 
 def pseudonimo(email: str, chave_hmac: bytes | None = None) -> str:
     return hmac.new(chave_hmac or chave(), normalizar_email(email).encode(), hashlib.sha256).hexdigest()
+
+
+CODIGO_MINUTOS = 15
+CODIGO_TENTATIVAS = 5
+
+
+def _hash_codigo(pid: str, codigo: str, chave_hmac: bytes | None) -> str:
+    return hmac.new(chave_hmac or chave(), f"{pid}:{codigo}".encode(), hashlib.sha256).hexdigest()
+
+
+def pedir_exclusao(con: sqlite3.Connection, email: str, agora: datetime | None = None,
+                   chave_hmac: bytes | None = None) -> str:
+    """Gera o código de confirmação e devolve para quem vai enviá-lo por e-mail.
+
+    Gera mesmo que não exista dado ligado ao e-mail: a resposta da API é a
+    mesma nos dois casos, para ninguém descobrir quais e-mails têm cadastro
+    pedindo exclusão em nome dos outros. Um pedido novo substitui o anterior.
+    """
+    pid = pseudonimo(email, chave_hmac)
+    codigo = f"{secrets.randbelow(10**6):06d}"
+    expira = tempo.texto((agora or tempo.agora()) + timedelta(minutes=CODIGO_MINUTOS))
+    with con:
+        con.execute("INSERT OR REPLACE INTO pedidos_exclusao VALUES (?, ?, ?, 0)",
+                    (pid, _hash_codigo(pid, codigo, chave_hmac), expira))
+    return codigo
+
+
+def confirmar_exclusao(con: sqlite3.Connection, email: str, codigo: str, agora: datetime | None = None,
+                       chave_hmac: bytes | None = None) -> dict[str, int] | None:
+    """Apaga os dados se o código confere. None = código inválido, vencido ou esgotado.
+
+    Seis dígitos são um milhão de combinações; com 5 tentativas por código,
+    a chance de acertar no chute é 1 em 200 mil por pedido, e pedir de novo
+    é limitado por IP na API.
+    """
+    pid = pseudonimo(email, chave_hmac)
+    pedido = con.execute("SELECT codigo_hash, expira, tentativas FROM pedidos_exclusao WHERE pessoa_id = ?",
+                         (pid,)).fetchone()
+    if not pedido:
+        return None
+    if pedido["tentativas"] >= CODIGO_TENTATIVAS or tempo.ler(pedido["expira"]) < (agora or tempo.agora()):
+        with con:
+            con.execute("DELETE FROM pedidos_exclusao WHERE pessoa_id = ?", (pid,))
+        return None
+    if not hmac.compare_digest(pedido["codigo_hash"], _hash_codigo(pid, codigo.strip(), chave_hmac)):
+        with con:
+            con.execute("UPDATE pedidos_exclusao SET tentativas = tentativas + 1 WHERE pessoa_id = ?", (pid,))
+        return None
+    with con:
+        con.execute("DELETE FROM pedidos_exclusao WHERE pessoa_id = ?", (pid,))
+    return excluir_titular(con, email, chave_hmac)
 
 
 def excluir_titular(con: sqlite3.Connection, email: str, chave_hmac: bytes | None = None) -> dict[str, int]:
