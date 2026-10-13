@@ -57,8 +57,21 @@ CREATE INDEX IF NOT EXISTS consentimentos_anon ON consentimentos (anon_id);
 """
 
 
-def conectar(caminho: str | Path) -> sqlite3.Connection:
-    con = sqlite3.connect(caminho, check_same_thread=False)
+def conectar(caminho: str | Path, criar: bool = True) -> sqlite3.Connection:
+    """Abre o banco. `criar=False` pula o esquema (já criado na subida do servidor).
+
+    WAL deixa leituras do painel rodarem enquanto a coleta grava; o timeout
+    faz uma escrita esperar a outra até 5 s em vez de falhar na hora.
+
+    check_same_thread=False não volta a compartilhar conexão: cada uma
+    continua sendo de uma requisição só. O FastAPI é que abre a dependência
+    numa thread do pool e roda a rota em outra, e a checagem padrão do
+    sqlite3 recusaria isso.
+    """
+    con = sqlite3.connect(caminho, timeout=5, check_same_thread=False)
     con.row_factory = sqlite3.Row
-    con.executescript(ESQUEMA)
+    if str(caminho) != ":memory:":
+        con.execute("PRAGMA journal_mode=WAL")
+    if criar:
+        con.executescript(ESQUEMA)
     return con

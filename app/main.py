@@ -17,11 +17,13 @@ na mão. Sem consentimento registrado, o evento é recusado e não é gravado.
 from __future__ import annotations
 
 import os
+import sqlite3
+from collections.abc import Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlparse
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -34,12 +36,32 @@ from app.jornadas import JANELA_DIAS, montar
 
 RAIZ = Path(__file__).resolve().parent.parent
 WEB = RAIZ / "web"
-con = conectar(os.environ.get("ATRIBUICAO_BANCO", RAIZ / "atribuicao.db"))
+CAMINHO_BANCO = os.environ.get("ATRIBUICAO_BANCO", str(RAIZ / "atribuicao.db"))
+
+
+def banco() -> Iterator[sqlite3.Connection]:
+    """Uma conexão por requisição, fechada no fim.
+
+    FastAPI roda as rotas síncronas num pool de threads. Uma conexão única
+    compartilhada (check_same_thread=False) deixa duas requisições usarem o
+    mesmo cursor ao mesmo tempo, e transações de uma vazam para a outra.
+    Abrir uma conexão SQLite custa microssegundos; não vale o risco.
+    """
+    con = conectar(CAMINHO_BANCO, criar=False)
+    try:
+        yield con
+    finally:
+        con.close()
+
+
+Banco = Depends(banco)
 
 
 @asynccontextmanager
 async def ciclo(_: FastAPI):
+    con = conectar(CAMINHO_BANCO)  # cria o esquema uma vez, na subida
     privacidade.aplicar_retencao(con)
+    con.close()
     yield
 
 
@@ -55,7 +77,7 @@ def classe_aparelho(user_agent: str) -> str:
     return "celular" if any(k in ua for k in ("mobi", "android", "iphone")) else "computador"
 
 
-def tem_consentimento(anon_id: str) -> bool:
+def tem_consentimento(con: sqlite3.Connection, anon_id: str) -> bool:
     linha = con.execute(
         "SELECT aceito FROM consentimentos WHERE anon_id = ? ORDER BY id DESC LIMIT 1", (anon_id,)
     ).fetchone()
@@ -90,7 +112,7 @@ class Titular(BaseModel):
     email: str = Field(min_length=3, max_length=254)
 
 
-def vincular(anon_id: str, email: str) -> str:
+def vincular(con: sqlite3.Connection, anon_id: str, email: str) -> str:
     pid = privacidade.pseudonimo(email)
     with con:
         con.execute("INSERT OR IGNORE INTO vinculos VALUES (?, ?, ?)", (anon_id, pid, agora()))
@@ -98,7 +120,7 @@ def vincular(anon_id: str, email: str) -> str:
 
 
 @app.post("/api/consentimento")
-def registrar_consentimento(c: Consentimento):
+def registrar_consentimento(c: Consentimento, con: sqlite3.Connection = Banco):
     with con:
         con.execute(
             "INSERT INTO consentimentos (anon_id, versao, aceito, momento) VALUES (?, ?, ?, ?)",
@@ -108,13 +130,13 @@ def registrar_consentimento(c: Consentimento):
 
 
 @app.post("/api/evento")
-def registrar_evento(ev: Evento, request: Request):
-    if not tem_consentimento(ev.anon_id):
+def registrar_evento(ev: Evento, request: Request, con: sqlite3.Connection = Banco):
+    if not tem_consentimento(con, ev.anon_id):
         raise HTTPException(403, "sem consentimento registrado para este aparelho")
     canal = None
     if ev.tipo == "visita":
         canal = classificar(ev.utm_source, ev.utm_medium, ev.referrer, ev.host, ev.gclid)
-    pessoa_id = vincular(ev.anon_id, ev.email) if ev.email else None
+    pessoa_id = vincular(con, ev.anon_id, ev.email) if ev.email else None
     with con:
         con.execute(
             """INSERT INTO eventos (anon_id, pessoa_id, tipo, canal, utm_source, utm_medium,
@@ -131,10 +153,10 @@ def registrar_evento(ev: Evento, request: Request):
 
 
 @app.post("/api/identificar")
-def identificar(i: Identificacao):
-    if not tem_consentimento(i.anon_id):
+def identificar(i: Identificacao, con: sqlite3.Connection = Banco):
+    if not tem_consentimento(con, i.anon_id):
         raise HTTPException(403, "sem consentimento registrado para este aparelho")
-    vincular(i.anon_id, i.email)
+    vincular(con, i.anon_id, i.email)
     return {"ok": True}
 
 
@@ -146,7 +168,7 @@ def _serializar(resultados) -> dict:
 
 
 @app.get("/api/painel")
-def painel(janela_dias: int = JANELA_DIAS):
+def painel(janela_dias: int = JANELA_DIAS, con: sqlite3.Connection = Banco):
     com = montar(con, janela_dias)
     sem = montar(con, janela_dias, juntar=False)
     visitas = con.execute(
@@ -172,12 +194,12 @@ def painel(janela_dias: int = JANELA_DIAS):
 
 
 @app.delete("/api/titular")
-def excluir(t: Titular):
+def excluir(t: Titular, con: sqlite3.Connection = Banco):
     return {"ok": True, "apagados": privacidade.excluir_titular(con, t.email)}
 
 
 @app.post("/api/retencao")
-def retencao(dias: int = privacidade.RETENCAO_DIAS):
+def retencao(dias: int = privacidade.RETENCAO_DIAS, con: sqlite3.Connection = Banco):
     return {"ok": True, "eventos_apagados": privacidade.aplicar_retencao(con, dias)}
 
 

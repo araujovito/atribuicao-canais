@@ -27,7 +27,7 @@ Uso: projeto de portfólio pessoal. Não usa dados reais de ninguém.
 | 9 | CRM | acompanhar o lead até virar cliente/venda | Salesforce, HubSpot, Pipedrive |
 | 10 | Testes A/B e feature flags | testar versões de página | Optimizely, VWO, LaunchDarkly |
 | 11 | Gestão de consentimento (LGPD) | banner de cookies e registro do "sim" | OneTrust, Cookiebot, Adopt |
-| 12 | Inteligência de mercado (de fora) | estimar tráfego e ferramentas de outros sites | Similarweb, Semrush, Ahrefs, BuiltWith |
+| 12 | Inteligência de mercado (de fora) | estimar tráfego e ferramentas de outros sites | feito |
 
 ## Repositórios de código aberto por serviço
 
@@ -112,6 +112,10 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Item 12: uma conexão SQLite por requisição (dependência
+  do FastAPI), WAL e espera de até 5 s por escrita concorrente. Teste com
+  40 eventos simultâneos em 8 threads.
 
 - **2026-10-13** — Item 14: datas sempre em UTC com deslocamento
   (`app/tempo.py`). Texto ISO no mesmo formato mantém a ordem alfabética

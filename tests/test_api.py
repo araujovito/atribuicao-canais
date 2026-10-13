@@ -1,12 +1,26 @@
 import os
+import tempfile
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
-os.environ["ATRIBUICAO_BANCO"] = ":memory:"
+# Arquivo, não :memory: — cada requisição abre a própria conexão, e cada
+# conexão a ":memory:" seria um banco vazio diferente.
+os.environ["ATRIBUICAO_BANCO"] = str(Path(tempfile.mkdtemp()) / "teste.db")
 os.environ["ATRIBUICAO_CHAVE_HMAC"] = "chave-de-teste"
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app import main
+from app.banco import conectar
+
+
+def consultar(sql):
+    con = conectar(main.CAMINHO_BANCO)
+    try:
+        return con.execute(sql).fetchall()
+    finally:
+        con.close()
 
 CELULAR = {"user-agent": "Mozilla/5.0 (Linux; Android 14) Mobile"}
 PC = {"user-agent": "Mozilla/5.0 (X11; Linux x86_64)"}
@@ -14,9 +28,13 @@ PC = {"user-agent": "Mozilla/5.0 (X11; Linux x86_64)"}
 
 @pytest.fixture
 def cliente():
-    for tabela in ("eventos", "vinculos", "consentimentos"):
-        main.con.execute(f"DELETE FROM {tabela}")
-    return TestClient(main.app)
+    con = conectar(main.CAMINHO_BANCO)
+    with con:
+        for tabela in ("eventos", "vinculos", "consentimentos"):
+            con.execute(f"DELETE FROM {tabela}")
+    con.close()
+    with TestClient(main.app) as c:
+        yield c
 
 
 def aceitar(cliente, anon):
@@ -26,7 +44,7 @@ def aceitar(cliente, anon):
 def test_sem_consentimento_nao_grava(cliente):
     r = cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "visita"})
     assert r.status_code == 403
-    assert main.con.execute("SELECT COUNT(*) FROM eventos").fetchone()[0] == 0
+    assert consultar("SELECT COUNT(*) FROM eventos")[0][0] == 0
 
 
 def test_consentimento_revogado_vale(cliente):
@@ -41,7 +59,7 @@ def test_minimizacao(cliente):
         "anon_id": "aparelho-1", "tipo": "conversao", "valor": 50,
         "referrer": "https://busca.exemplo/?q=meu+cpf+123", "email": "ana@exemplo.com",
     })
-    linha = dict(main.con.execute("SELECT * FROM eventos").fetchone())
+    linha = dict(consultar("SELECT * FROM eventos")[0])
     assert linha["referrer_host"] == "busca.exemplo"
     assert linha["aparelho"] == "celular"
     assert "ana@exemplo.com" not in str(linha)
@@ -74,4 +92,17 @@ def test_exclusao_pela_api(cliente):
     cliente.post("/api/evento", json={"anon_id": "celular-ana", "tipo": "visita", "email": "ana@exemplo.com"})
     r = cliente.request("DELETE", "/api/titular", json={"email": "ana@exemplo.com"})
     assert r.json()["apagados"]["eventos_identificados"] == 1
-    assert main.con.execute("SELECT COUNT(*) FROM eventos").fetchone()[0] == 0
+    assert consultar("SELECT COUNT(*) FROM eventos")[0][0] == 0
+
+
+def test_requisicoes_simultaneas(cliente):
+    # Antes, uma conexão única era compartilhada entre as threads do servidor.
+    aceitar(cliente, "aparelho-concorrente")
+
+    def enviar(_):
+        return cliente.post("/api/evento", json={"anon_id": "aparelho-concorrente", "tipo": "visita"}).status_code
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        codigos = list(pool.map(enviar, range(40)))
+    assert codigos == [200] * 40
+    assert consultar("SELECT COUNT(*) FROM eventos")[0][0] == 40
