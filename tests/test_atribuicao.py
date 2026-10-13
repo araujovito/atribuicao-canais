@@ -1,10 +1,10 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from app.atribuicao import Jornada, atribuir, comparar, efeitos_remocao
 
-T0 = datetime(2026, 10, 1, 12, 0)
+T0 = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 
 
 def jornada(*canais, converteu=True, valor=100.0, dias_entre=1.0):

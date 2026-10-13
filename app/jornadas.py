@@ -22,6 +22,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+from app import tempo
 from app.atribuicao import DIRETO, Jornada
 from app.identidade import aparelhos_ambiguos, mapa_aparelhos, resolver
 
@@ -55,7 +56,7 @@ def montar(con: sqlite3.Connection, janela_dias: int = JANELA_DIAS, juntar: bool
     for dono, eventos in grupos.items():
         pendentes: list[tuple[str, datetime, str]] = []
         for ev in eventos:
-            t = datetime.fromisoformat(ev["momento"])
+            t = tempo.ler(ev["momento"])
             if ev["tipo"] == "visita":
                 if ev["canal"]:
                     pendentes.append((ev["canal"], t, ev["anon_id"]))

@@ -41,6 +41,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.banco import conectar  # noqa: E402
 from app.privacidade import pseudonimo  # noqa: E402
+from app.tempo import agora, texto  # noqa: E402
 
 PRIMEIRO_TOQUE = {
     "Social pago": 0.24, "Busca orgânica": 0.20, "Busca paga": 0.14, "Display": 0.16,
@@ -116,7 +117,7 @@ def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime) -> dict[s
             fonte, midia = UTM.get(canal, (None, None))
             ref = REFERRER.get(canal)
             eventos.append((anon, None, "visita", canal, fonte, midia, None, ref,
-                            "celular" if anon == celular else "computador", 0.0, t.isoformat(timespec="seconds")))
+                            "celular" if anon == celular else "computador", 0.0, texto(t)))
             t += timedelta(days=rng.expovariate(1 / 2.5), hours=rng.uniform(0, 5))
 
         ultimo_aparelho = computador if perfil == "dois" else (celular or computador)
@@ -124,20 +125,20 @@ def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime) -> dict[s
             valor = round(min(rng.lognormvariate(4.3, 0.6), 900), 2)
             eventos.append((ultimo_aparelho, pid, "conversao", None, None, None, None, None,
                             "celular" if ultimo_aparelho == celular else "computador", valor,
-                            t.isoformat(timespec="seconds")))
-            vinculos.append((ultimo_aparelho, pid, t.isoformat(timespec="seconds")))
+                            texto(t)))
+            vinculos.append((ultimo_aparelho, pid, texto(t)))
             stats["compras"] += 1
             if perfil == "dois" and len(aparelhos_usados) > 1:
                 stats["compras_entre_aparelhos"] += 1
         # Login no celular: sem ele, não há como saber que é a mesma pessoa.
         if perfil == "dois" and rng.random() < 0.6:
-            vinculos.append((celular, pid, inicio.isoformat(timespec="seconds")))
+            vinculos.append((celular, pid, texto(inicio)))
         # Login no computador (área do cliente, lista de desejos) sem comprar.
         if computador and rng.random() < 0.3:
-            vinculos.append((computador, pid, inicio.isoformat(timespec="seconds")))
+            vinculos.append((computador, pid, texto(inicio)))
 
         for anon in aparelhos_usados | {ultimo_aparelho}:
-            consent.append((anon, "v1", 1, inicio.isoformat(timespec="seconds")))
+            consent.append((anon, "v1", 1, texto(inicio)))
 
     with con:
         con.executemany(
@@ -159,7 +160,7 @@ def main() -> None:
     ap.add_argument("--semente", type=int, default=42)
     ap.add_argument("--banco", type=Path, default=Path(__file__).resolve().parent.parent / "atribuicao.db")
     args = ap.parse_args()
-    stats = gerar(args.banco, args.pessoas, args.semente, datetime.now().replace(microsecond=0))
+    stats = gerar(args.banco, args.pessoas, args.semente, agora())
     print(f"{args.banco}: " + ", ".join(f"{k}={v}" for k, v in stats.items()))
 
 

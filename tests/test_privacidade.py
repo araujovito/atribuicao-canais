@@ -1,13 +1,14 @@
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from app.banco import conectar
 from app.privacidade import aplicar_retencao, excluir_titular, pseudonimo
+from app.tempo import texto
 
 CHAVE = b"chave-de-teste"
-AGORA = datetime(2026, 10, 13, 12, 0)
+AGORA = datetime(2026, 10, 13, 12, 0, tzinfo=timezone.utc)
 
 
 @pytest.fixture
@@ -18,12 +19,12 @@ def con():
 def evento(con, anon, pessoa=None, momento=AGORA):
     con.execute(
         "INSERT INTO eventos (anon_id, pessoa_id, tipo, momento) VALUES (?, ?, 'visita', ?)",
-        (anon, pessoa, momento.isoformat()),
+        (anon, pessoa, texto(momento)),
     )
 
 
 def vinculo(con, anon, pessoa, momento=AGORA):
-    con.execute("INSERT INTO vinculos VALUES (?, ?, ?)", (anon, pessoa, momento.isoformat()))
+    con.execute("INSERT INTO vinculos VALUES (?, ?, ?)", (anon, pessoa, texto(momento)))
 
 
 def contar(con, tabela="eventos"):
@@ -74,7 +75,7 @@ def test_retencao(con):
     for anon in ("velho", "novo"):
         con.execute(
             "INSERT INTO consentimentos (anon_id, versao, aceito, momento) VALUES (?, 'v1', 1, ?)",
-            (anon, (AGORA - timedelta(days=400)).isoformat()),
+            (anon, texto(AGORA - timedelta(days=400))),
         )
     assert aplicar_retencao(con, agora=AGORA) == 1
     assert contar(con) == 1 and contar(con, "vinculos") == 0

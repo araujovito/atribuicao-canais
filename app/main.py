@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -27,7 +26,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app import privacidade
+from app import privacidade, tempo
 from app.atribuicao import NOMES, comparar
 from app.banco import conectar
 from app.canais import CANAIS, classificar
@@ -48,7 +47,7 @@ app = FastAPI(title="Atribuição de canais", lifespan=ciclo)
 
 
 def agora() -> str:
-    return datetime.now().isoformat(timespec="seconds")
+    return tempo.texto(tempo.agora())
 
 
 def classe_aparelho(user_agent: str) -> str:

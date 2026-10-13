@@ -1,11 +1,12 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from scripts.gerar_dados import gerar
 
 from app.banco import conectar
 from app.jornadas import montar
+from app.tempo import texto
 
-HOJE = datetime(2026, 10, 13, 12, 0)
+HOJE = datetime(2026, 10, 13, 12, 0, tzinfo=timezone.utc)
 
 
 def test_reproduzivel_e_sem_dado_real(tmp_path):
@@ -15,7 +16,7 @@ def test_reproduzivel_e_sem_dado_real(tmp_path):
     con = conectar(tmp_path / "a.db")
     # Só pseudônimos: nenhum e-mail no banco.
     assert not con.execute("SELECT 1 FROM eventos WHERE pessoa_id LIKE '%@%'").fetchone()
-    assert con.execute("SELECT MAX(momento) FROM eventos").fetchone()[0] <= HOJE.isoformat()
+    assert con.execute("SELECT MAX(momento) FROM eventos").fetchone()[0] <= texto(HOJE)
 
 
 def test_ha_compras_entre_aparelhos_e_juncao_recupera_parte(tmp_path):

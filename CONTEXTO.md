@@ -87,7 +87,7 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 | 11 | Modelos não comparados com a verdade conhecida do gerador | a fazer |
 | 12 | Uma conexão SQLite compartilhada entre requisições | a fazer |
 | 13 | Painel recalcula tudo a cada acesso | a fazer |
-| 14 | Datas sem fuso horário | a fazer |
+| 14 | Datas sem fuso horário | feito (`app/tempo.py`) |
 | 15 | Rastreador só funciona no mesmo domínio (sem CORS) | a fazer |
 | 16 | `gerar_dados.py` apaga o banco sem perguntar | a fazer |
 | 17 | README sem imagem do painel e sem licença | a fazer |
@@ -112,6 +112,10 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Item 14: datas sempre em UTC com deslocamento
+  (`app/tempo.py`). Texto ISO no mesmo formato mantém a ordem alfabética
+  igual à cronológica, então o SQL compara datas como texto sem erro.
 
 - **2026-10-13** — Lista de 18 melhorias registrada (seção própria), com
   as falhas de segurança primeiro.

@@ -26,6 +26,8 @@ import sqlite3
 import warnings
 from datetime import datetime, timedelta
 
+from app import tempo
+
 CHAVE_DEV = "chave-de-desenvolvimento-nao-usar-em-producao"
 RETENCAO_DIAS = 395  # ~13 meses
 
@@ -79,7 +81,7 @@ def aplicar_retencao(con: sqlite3.Connection, dias: int = RETENCAO_DIAS, agora: 
     ele é a prova de que a coleta foi autorizada e precisa durar enquanto
     houver dado coletado com base nele.
     """
-    limite = ((agora or datetime.now()) - timedelta(days=dias)).isoformat()
+    limite = tempo.texto((agora or tempo.agora()) - timedelta(days=dias))
     with con:
         n = con.execute("DELETE FROM eventos WHERE momento < ?", (limite,)).rowcount
         con.execute("DELETE FROM vinculos WHERE momento < ?", (limite,))
