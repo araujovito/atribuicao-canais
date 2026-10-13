@@ -4,10 +4,12 @@ Rotas:
     POST   /api/consentimento   registra o sim/não do banner (com versão do texto)
     POST   /api/evento          visita de entrada ou conversão; exige consentimento
     POST   /api/identificar     login/formulário: liga o aparelho ao pseudônimo
-    GET    /api/painel          atribuição por modelo, com e sem junção de aparelhos
+    GET    /api/painel          atribuição por modelo, com e sem junção [admin]
     DELETE /api/titular         exclusão a pedido (LGPD art. 18)
-    POST   /api/retencao        aplica o prazo de retenção (também roda ao subir)
+    POST   /api/retencao        aplica o prazo de retenção, mínimo 30 dias [admin]
     GET    /, /loja             painel e loja de demonstração
+
+[admin] = exige `Authorization: Bearer <token>`, ver app/acesso.py.
 
 O servidor confere o consentimento de novo, mesmo que o rastreador só envie
 depois do "sim": o navegador é do usuário, e qualquer um pode mandar um POST
@@ -23,12 +25,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from urllib.parse import urlparse
 
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app import privacidade, tempo
+from app.acesso import exigir_admin
 from app.atribuicao import NOMES, comparar
 from app.banco import conectar
 from app.canais import CANAIS, classificar
@@ -55,6 +58,7 @@ def banco() -> Iterator[sqlite3.Connection]:
 
 
 Banco = Depends(banco)
+Admin = [Depends(exigir_admin)]
 
 
 @asynccontextmanager
@@ -167,7 +171,7 @@ def _serializar(resultados) -> dict:
     }
 
 
-@app.get("/api/painel")
+@app.get("/api/painel", dependencies=Admin)
 def painel(janela_dias: int = JANELA_DIAS, con: sqlite3.Connection = Banco):
     com = montar(con, janela_dias)
     sem = montar(con, janela_dias, juntar=False)
@@ -198,8 +202,14 @@ def excluir(t: Titular, con: sqlite3.Connection = Banco):
     return {"ok": True, "apagados": privacidade.excluir_titular(con, t.email)}
 
 
-@app.post("/api/retencao")
-def retencao(dias: int = privacidade.RETENCAO_DIAS, con: sqlite3.Connection = Banco):
+@app.post("/api/retencao", dependencies=Admin)
+def retencao(
+    # Piso de 30 dias: o prazo existe para expirar dado velho, não para
+    # esvaziar o banco. Apagar tudo, se um dia for preciso, é operação
+    # deliberada fora da API, não um parâmetro.
+    dias: int = Query(privacidade.RETENCAO_DIAS, ge=30),
+    con: sqlite3.Connection = Banco,
+):
     return {"ok": True, "eventos_apagados": privacidade.aplicar_retencao(con, dias)}
 
 

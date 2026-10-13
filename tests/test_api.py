@@ -7,6 +7,7 @@ from pathlib import Path
 # conexão a ":memory:" seria um banco vazio diferente.
 os.environ["ATRIBUICAO_BANCO"] = str(Path(tempfile.mkdtemp()) / "teste.db")
 os.environ["ATRIBUICAO_CHAVE_HMAC"] = "chave-de-teste"
+os.environ["ATRIBUICAO_TOKEN_ADMIN"] = "token-de-teste"
 
 import pytest
 from fastapi.testclient import TestClient
@@ -24,6 +25,7 @@ def consultar(sql):
 
 CELULAR = {"user-agent": "Mozilla/5.0 (Linux; Android 14) Mobile"}
 PC = {"user-agent": "Mozilla/5.0 (X11; Linux x86_64)"}
+ADMIN = {"authorization": "Bearer token-de-teste"}
 
 
 @pytest.fixture
@@ -80,7 +82,7 @@ def test_jornada_celular_para_computador(cliente):
         "anon_id": "computador-ana", "tipo": "conversao", "valor": 200, "email": "Ana@Exemplo.com",
     })
 
-    p = cliente.get("/api/painel").json()
+    p = cliente.get("/api/painel", headers=ADMIN).json()
     assert p["resumo"]["conversoes_entre_aparelhos"] == 1
     assert p["modelos"]["ultimo_toque"]["receita"] == {"Busca paga": 200.0, "Direto": 0.0}
     # Sem a junção, o anúncio some e a venda fica com Direto.
@@ -106,3 +108,18 @@ def test_requisicoes_simultaneas(cliente):
         codigos = list(pool.map(enviar, range(40)))
     assert codigos == [200] * 40
     assert consultar("SELECT COUNT(*) FROM eventos")[0][0] == 40
+
+
+def test_painel_exige_token(cliente):
+    assert cliente.get("/api/painel").status_code == 401
+    assert cliente.get("/api/painel", headers={"authorization": "Bearer errado"}).status_code == 401
+    assert cliente.get("/api/painel", headers=ADMIN).status_code == 200
+
+
+def test_retencao_exige_token_e_nao_esvazia_o_banco(cliente):
+    aceitar(cliente, "aparelho-1")
+    cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "visita"})
+    assert cliente.post("/api/retencao?dias=0").status_code == 401
+    assert cliente.post("/api/retencao?dias=0", headers=ADMIN).status_code == 422
+    assert cliente.post("/api/retencao?dias=30", headers=ADMIN).json()["eventos_apagados"] == 0
+    assert consultar("SELECT COUNT(*) FROM eventos")[0][0] == 1

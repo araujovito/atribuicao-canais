@@ -17,8 +17,8 @@ Uso: projeto de portfólio pessoal. Não usa dados reais de ninguém.
 | # | Serviço | O que resolve | Quem vende (exemplos) |
 |---|---|---|---|
 | 1 | Análise de site (web analytics) | visitas, páginas, origem, celular x computador | Google Analytics 4, Adobe Analytics |
-| 2 | Rastreamento por UTM | saber qual link/campanha trouxe a visita | GA4, todas as ferramentas abaixo |
-| 3 | Junção de identidade entre aparelhos | mesma pessoa no celular e no computador | GA4 (User-ID, Google Signals), Mixpanel, Amplitude |
+| 2 | Rastreamento por UTM | saber qual link/campanha trouxe a visita | feito (token + piso de 30 dias) |
+| 3 | Junção de identidade entre aparelhos | mesma pessoa no celular e no computador | feito (`app/acesso.py`) |
 | 4 | Atribuição multicanal | quanto crédito cada canal recebe pela conversão | GA4, Triple Whale, Northbeam, Hyros |
 | 5 | Análise de produto (funis, retenção) | onde as pessoas desistem no caminho | Mixpanel, Amplitude, Heap |
 | 6 | Gravação de sessão e mapa de cliques | ver o que a pessoa fez na tela | Hotjar, Microsoft Clarity, FullStory |
@@ -112,6 +112,11 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Itens 2 e 3: painel e retenção exigem token de
+  administrador (`ATRIBUICAO_TOKEN_ADMIN`; sem ele, sorteado na subida e
+  escrito no log). Retenção com piso de 30 dias: `dias=0` agora dá 422.
+  Painel pede o token e guarda só na aba. Conferido em Chromium headless.
 
 - **2026-10-13** — Item 12: uma conexão SQLite por requisição (dependência
   do FastAPI), WAL e espera de até 5 s por escrita concorrente. Teste com
