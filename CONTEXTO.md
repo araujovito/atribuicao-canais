@@ -53,7 +53,7 @@ têm partes com licenças que restringem oferecer o produto como serviço a terc
 | Serviço | Onde | Status |
 |---|---|---|
 | 1, 2 Coleta de visitas e UTMs | `web/rastreio.js`, `app/main.py`, `app/canais.py` | em andamento: `app/canais.py` feito |
-| 3 Junção de identidade entre aparelhos | `app/identidade.py` | a fazer |
+| 3 Junção de identidade entre aparelhos | `app/identidade.py` | feito |
 | 4 Atribuição (5 modelos de regra + Markov) | `app/atribuicao.py` | a fazer |
 | 11 Consentimento + privacidade (HMAC, exclusão, retenção) | `web/loja.html`, `app/privacidade.py`, `app/main.py` | a fazer |
 | Painel comparando modelos | `web/index.html` | a fazer |
@@ -80,6 +80,12 @@ cima.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Junção de identidade (`app/identidade.py`). Só por
+  identificação própria (login/formulário). Aparelho ligado a uma pessoa
+  herda a pessoa inclusive nos eventos de antes do login; aparelho ligado a
+  duas ou mais pessoas fica ambíguo e não funde ninguém (descartado o
+  union-find simples, que juntaria a família inteira do notebook de casa).
 
 - **2026-10-13** — Repositório recriado do zero a partir deste documento.
   Classificação de canais (`app/canais.py`) com testes: UTM ganha do referrer,
