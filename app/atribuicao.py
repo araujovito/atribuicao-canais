@@ -39,6 +39,7 @@ class Jornada:
     valor: float = 0.0
     momento_conversao: datetime | None = None
     pessoa: str = field(default="")
+    aparelhos: frozenset[str] = frozenset()  # anon_ids envolvidos; >1 = jornada entre aparelhos
 
     @property
     def canais(self) -> list[str]:

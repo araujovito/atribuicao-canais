@@ -52,11 +52,12 @@ têm partes com licenças que restringem oferecer o produto como serviço a terc
 
 | Serviço | Onde | Status |
 |---|---|---|
-| 1, 2 Coleta de visitas e UTMs | `web/rastreio.js`, `app/main.py`, `app/canais.py` | em andamento: `app/canais.py` feito |
+| 1, 2 Coleta de visitas e UTMs | `web/rastreio.js`, `app/main.py`, `app/canais.py` | em andamento: API e canais feitos, falta `rastreio.js` |
 | 3 Junção de identidade entre aparelhos | `app/identidade.py` | feito |
 | 4 Atribuição (5 modelos de regra + Markov) | `app/atribuicao.py` | feito |
-| 11 Consentimento + privacidade (HMAC, exclusão, retenção) | `web/loja.html`, `app/privacidade.py`, `app/banco.py`, `app/main.py` | em andamento: `privacidade.py` e esquema feitos |
-| Painel comparando modelos | `web/index.html` | a fazer |
+| 11 Consentimento + privacidade (HMAC, exclusão, retenção) | `web/loja.html`, `app/privacidade.py`, `app/banco.py`, `app/main.py` | em andamento: servidor feito, falta o banner em `loja.html` |
+| Montagem das jornadas (janela de 30 dias) | `app/jornadas.py` | feito |
+| Painel comparando modelos | `web/index.html` | a fazer (API `/api/painel` pronta) |
 | Dados fictícios para demonstração | `scripts/gerar_dados.py` | a fazer |
 | 5 Funis | — | possível próximo passo |
 | Publicação online para teste real (celular + computador) | Render/Railway | pendente: conta do Vitor |
@@ -80,6 +81,12 @@ cima.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — API (`app/main.py`, FastAPI) e montagem das jornadas
+  (`app/jornadas.py`). O servidor confere o consentimento de novo e recusa
+  evento sem ele. `/api/painel` devolve a atribuição com e sem junção de
+  aparelhos: no teste, a venda feita no computador depois do anúncio no
+  celular vai para Busca paga com junção e para Direto sem ela.
 
 - **2026-10-13** — Privacidade (`app/privacidade.py`) e esquema SQLite
   (`app/banco.py`). HMAC-SHA256 com chave secreta em vez de hash puro
