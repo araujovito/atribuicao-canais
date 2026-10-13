@@ -58,7 +58,7 @@ têm partes com licenças que restringem oferecer o produto como serviço a terc
 | 11 Consentimento + privacidade (HMAC, exclusão, retenção) | `web/loja.html`, `app/privacidade.py`, `app/banco.py`, `app/main.py` | feito |
 | Montagem das jornadas (janela de 30 dias) | `app/jornadas.py` | feito |
 | Painel comparando modelos | `web/index.html` | a fazer (API `/api/painel` pronta) |
-| Dados fictícios para demonstração | `scripts/gerar_dados.py` | a fazer |
+| Dados fictícios para demonstração | `scripts/gerar_dados.py` | feito |
 | 5 Funis | — | possível próximo passo |
 | Publicação online para teste real (celular + computador) | Render/Railway | pendente: conta do Vitor |
 
@@ -74,6 +74,11 @@ cima.
   os navegadores combatem.
 - **Markov de primeira ordem:** o estado não lembra de onde a pessoa veio
   (limitação documentada em teste). Evolução: ordem maior ou valores de Shapley.
+- **Atribuição não é causa.** No dado fictício, Display tem efeito zero na
+  compra e mesmo assim recebe ~8% do crédito no Markov, tanto quanto no
+  primeiro toque, porque abre jornadas. Todo modelo de atribuição mede
+  participação no caminho; efeito causal só com teste de incrementalidade
+  (grupo de controle sem o anúncio).
 - **SQLite** no protótipo; em produção, Postgres ou banco analítico + fila de eventos.
 - **Dados de outros sites:** só informação pública (tecnologias usadas, estimativas,
   bibliotecas de anúncios). Dados de visitantes pertencem ao dono do site.
@@ -81,6 +86,12 @@ cima.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Dados fictícios (`scripts/gerar_dados.py`): 2.000
+  pessoas, semente fixa, e-mails em `exemplo.invalid`. Com a semente padrão:
+  ~460 compras, ~105 delas entre aparelhos, das quais a junção recupera ~83
+  (só quem fez login no celular). Display com efeito zero recebe ~8% no
+  Markov: achado registrado em "Decisões e limites".
 
 - **2026-10-13** — Rastreador (`web/rastreio.js`) e loja de demonstração
   (`web/loja.html`) com banner de consentimento, login, compra, revogação e
