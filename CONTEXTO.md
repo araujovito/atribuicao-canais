@@ -54,7 +54,7 @@ têm partes com licenças que restringem oferecer o produto como serviço a terc
 |---|---|---|
 | 1, 2 Coleta de visitas e UTMs | `web/rastreio.js`, `app/main.py`, `app/canais.py` | em andamento: `app/canais.py` feito |
 | 3 Junção de identidade entre aparelhos | `app/identidade.py` | feito |
-| 4 Atribuição (5 modelos de regra + Markov) | `app/atribuicao.py` | a fazer |
+| 4 Atribuição (5 modelos de regra + Markov) | `app/atribuicao.py` | feito |
 | 11 Consentimento + privacidade (HMAC, exclusão, retenção) | `web/loja.html`, `app/privacidade.py`, `app/main.py` | a fazer |
 | Painel comparando modelos | `web/index.html` | a fazer |
 | Dados fictícios para demonstração | `scripts/gerar_dados.py` | a fazer |
@@ -80,6 +80,13 @@ cima.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Atribuição (`app/atribuicao.py`): primeiro toque, último
+  toque não direto, linear, decaimento temporal (meia-vida 7 dias) e posição
+  40/20/40; Markov de primeira ordem com efeito de remoção, resolvido por
+  eliminação de Gauss sem numpy. Teste garante que todo modelo distribui
+  exatamente as conversões e a receita existentes. A limitação da primeira
+  ordem (não lembra a origem) está escrita como teste.
 
 - **2026-10-13** — Junção de identidade (`app/identidade.py`). Só por
   identificação própria (login/formulário). Aparelho ligado a uma pessoa

@@ -1,0 +1,211 @@
+"""Modelos de atribuição: quanto crédito cada canal recebe por uma conversão.
+
+Cinco modelos de regra (os mesmos que GA4, RD Station e afins mostram) e um
+modelo baseado em dados (cadeia de Markov com efeito de remoção).
+
+Entrada comum: uma lista de `Jornada` — a sequência de toques de UMA pessoa
+(já com aparelhos juntados, ver app/identidade.py) até converter ou até a
+janela acabar sem conversão.
+
+Decisões:
+- Último toque ignora Direto quando há outro canal na jornada. É a convenção
+  do GA4 ("último clique não direto"): quem digita o endereço já conhecia a
+  marca por algum canal, e dar a venda para Direto esconde esse canal. Os
+  outros modelos de regra contam Direto como qualquer canal — a comparação no
+  painel mostra a diferença.
+- Decaimento temporal com meia-vida de 7 dias, o padrão do Google Ads.
+  Parâmetro, não constante: dá para testar outras meias-vidas.
+- Posição: 40% primeiro, 40% último, 20% dividido no meio. Com dois toques,
+  50/50; com um, 100%.
+- Markov usa TODAS as jornadas, inclusive as que não converteram — é delas
+  que sai a informação de que um canal leva a lugar nenhum. Os modelos de
+  regra só olham jornadas que converteram.
+"""
+
+from __future__ import annotations
+
+from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import datetime
+
+DIRETO = "Direto"
+INICIO, CONVERSAO, NULO = "(início)", "(conversão)", "(nulo)"
+
+
+@dataclass
+class Jornada:
+    toques: list[tuple[str, datetime]]  # (canal, momento), em ordem cronológica
+    converteu: bool = False
+    valor: float = 0.0
+    momento_conversao: datetime | None = None
+    pessoa: str = field(default="")
+
+    @property
+    def canais(self) -> list[str]:
+        return [canal for canal, _ in self.toques]
+
+
+# --- modelos de regra: cada um devolve o peso de cada toque (soma 1) --------
+
+
+def _primeiro(j: Jornada) -> list[float]:
+    return [1.0] + [0.0] * (len(j.toques) - 1)
+
+
+def _ultimo_nao_direto(j: Jornada) -> list[float]:
+    pesos = [0.0] * len(j.toques)
+    for i in range(len(j.toques) - 1, -1, -1):
+        if j.toques[i][0] != DIRETO:
+            pesos[i] = 1.0
+            return pesos
+    pesos[-1] = 1.0  # jornada só de Direto: aí o crédito é dele mesmo
+    return pesos
+
+
+def _linear(j: Jornada) -> list[float]:
+    n = len(j.toques)
+    return [1.0 / n] * n
+
+
+def _decaimento(j: Jornada, meia_vida_dias: float = 7.0) -> list[float]:
+    fim = j.momento_conversao or j.toques[-1][1]
+    brutos = [0.5 ** (max((fim - t).total_seconds(), 0) / 86400 / meia_vida_dias) for _, t in j.toques]
+    total = sum(brutos)
+    return [b / total for b in brutos]
+
+
+def _posicao(j: Jornada) -> list[float]:
+    n = len(j.toques)
+    if n == 1:
+        return [1.0]
+    if n == 2:
+        return [0.5, 0.5]
+    meio = 0.2 / (n - 2)
+    return [0.4] + [meio] * (n - 2) + [0.4]
+
+
+MODELOS_REGRA = {
+    "primeiro_toque": _primeiro,
+    "ultimo_toque": _ultimo_nao_direto,
+    "linear": _linear,
+    "decaimento_temporal": _decaimento,
+    "posicao": _posicao,
+}
+
+NOMES = {
+    "primeiro_toque": "Primeiro toque",
+    "ultimo_toque": "Último toque (não direto)",
+    "linear": "Linear",
+    "decaimento_temporal": "Decaimento temporal (meia-vida 7 dias)",
+    "posicao": "Posição (40/20/40)",
+    "markov": "Markov (efeito de remoção)",
+}
+
+
+@dataclass
+class Resultado:
+    conversoes: dict[str, float]  # canal -> conversões atribuídas (fracionárias)
+    receita: dict[str, float]  # canal -> receita atribuída
+
+
+def atribuir_regra(jornadas: list[Jornada], modelo: str) -> Resultado:
+    regra = MODELOS_REGRA[modelo]
+    conv: dict[str, float] = defaultdict(float)
+    rec: dict[str, float] = defaultdict(float)
+    for j in jornadas:
+        if not j.converteu or not j.toques:
+            continue
+        for (canal, _), peso in zip(j.toques, regra(j)):
+            conv[canal] += peso
+            rec[canal] += peso * j.valor
+    return Resultado(dict(conv), dict(rec))
+
+
+# --- Markov -----------------------------------------------------------------
+
+
+def _transicoes(jornadas: list[Jornada]) -> dict[str, dict[str, float]]:
+    contagem: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+    for j in jornadas:
+        if not j.toques:
+            continue
+        caminho = [INICIO, *j.canais, CONVERSAO if j.converteu else NULO]
+        for de, para in zip(caminho, caminho[1:]):
+            contagem[de][para] += 1
+    return {
+        de: {para: n / sum(destinos.values()) for para, n in destinos.items()}
+        for de, destinos in contagem.items()
+    }
+
+
+def _prob_conversao(trans: dict[str, dict[str, float]], removido: str | None = None) -> float:
+    """Probabilidade de sair de (início) e chegar em (conversão).
+
+    Sistema linear p(s) = soma_t T(s,t) p(t), com p(conversão)=1 e p(nulo)=0.
+    Remover um canal = toda transição para ele vai para (nulo). Resolvido por
+    eliminação de Gauss: são no máximo uma dúzia de estados, não vale trazer
+    numpy só para isso.
+    """
+    estados = [s for s in trans if s != removido]
+    idx = {s: i for i, s in enumerate(estados)}
+    n = len(estados)
+    a = [[0.0] * (n + 1) for _ in range(n)]
+    for s, i in idx.items():
+        a[i][i] = 1.0
+        for t, p in trans[s].items():
+            if t == CONVERSAO:
+                a[i][n] += p
+            elif t in idx:  # (nulo) e o canal removido contribuem 0
+                a[i][idx[t]] -= p
+    for col in range(n):
+        piv = max(range(col, n), key=lambda r: abs(a[r][col]))
+        a[col], a[piv] = a[piv], a[col]
+        if abs(a[col][col]) < 1e-12:
+            continue
+        for r in range(n):
+            if r != col and a[r][col]:
+                f = a[r][col] / a[col][col]
+                for c in range(col, n + 1):
+                    a[r][c] -= f * a[col][c]
+    i = idx[INICIO]
+    return a[i][n] / a[i][i] if abs(a[i][i]) > 1e-12 else 0.0
+
+
+def efeitos_remocao(jornadas: list[Jornada]) -> dict[str, float]:
+    """Queda relativa na probabilidade de conversão ao remover cada canal."""
+    trans = _transicoes(jornadas)
+    if INICIO not in trans:
+        return {}
+    base = _prob_conversao(trans)
+    if base == 0:
+        return {}
+    canais = {c for j in jornadas for c in j.canais}
+    return {c: (base - _prob_conversao(trans, removido=c)) / base for c in sorted(canais)}
+
+
+def atribuir_markov(jornadas: list[Jornada]) -> Resultado:
+    """Divide conversões e receita totais na proporção do efeito de remoção.
+
+    A receita usa a mesma proporção das conversões: a cadeia modela SE a
+    pessoa converte, não QUANTO gasta.
+    """
+    efeitos = efeitos_remocao(jornadas)
+    soma = sum(efeitos.values())
+    total_conv = sum(1 for j in jornadas if j.converteu and j.toques)
+    total_rec = sum(j.valor for j in jornadas if j.converteu and j.toques)
+    if not soma:
+        return Resultado({}, {})
+    return Resultado(
+        {c: total_conv * e / soma for c, e in efeitos.items()},
+        {c: total_rec * e / soma for c, e in efeitos.items()},
+    )
+
+
+def atribuir(jornadas: list[Jornada], modelo: str) -> Resultado:
+    if modelo == "markov":
+        return atribuir_markov(jornadas)
+    return atribuir_regra(jornadas, modelo)
+
+
+def comparar(jornadas: list[Jornada]) -> dict[str, Resultado]:
+    return {m: atribuir(jornadas, m) for m in NOMES}
