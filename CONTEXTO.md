@@ -87,6 +87,9 @@ cima.
 
 Mais recente primeiro.
 
+- **2026-10-13** — README para quem chega sem contexto: como rodar,
+  arquitetura, decisões, o que os dados fictícios mostram e limites.
+
 - **2026-10-13** — Painel (`web/index.html`), sem biblioteca de gráficos:
   indicadores, barras pareadas com e sem junção entre aparelhos, matriz canal
   × modelo e visitas por aparelho. Paleta de duas séries validada para
