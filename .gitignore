@@ -1,0 +1,13 @@
+# Banco local e dados gerados: o projeto só usa dados fictícios, mas nem eles
+# entram no git — scripts/gerar_dados.py recria tudo.
+*.db
+*.db-journal
+dados/
+
+# Chave do HMAC (pseudonimização). Nunca versionar.
+.env
+
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
