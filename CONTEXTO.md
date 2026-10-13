@@ -86,7 +86,7 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 | 10 | Créditos sem margem de erro | a fazer |
 | 11 | Modelos não comparados com a verdade conhecida do gerador | a fazer |
 | 12 | Uma conexão SQLite compartilhada entre requisições | a fazer |
-| 13 | Painel recalcula tudo a cada acesso | a fazer |
+| 13 | Painel recalcula tudo a cada acesso | feito (cache por versão dos dados) |
 | 14 | Datas sem fuso horário | feito (`app/tempo.py`) |
 | 15 | Rastreador só funciona no mesmo domínio (sem CORS) | a fazer |
 | 16 | `gerar_dados.py` apaga o banco sem perguntar | a fazer |
@@ -112,6 +112,12 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Item 13: cache do painel por (janela, versão dos dados).
+  Versão = contador mantido por triggers. Descartada a assinatura por
+  contagem/ids: sem AUTOINCREMENT o SQLite reaproveita o id da última linha
+  apagada. Cálculo medido em 63 ms com 4,8 mil eventos; o ganho cresce com o
+  volume e com o bootstrap (item 10).
 
 - **2026-10-13** — Item 4: limite por IP em memória (60 eventos/min,
   5 pedidos de exclusão/hora, 10 confirmações/hora, 20 consentimentos e

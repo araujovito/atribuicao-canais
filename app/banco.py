@@ -55,6 +55,16 @@ CREATE TABLE IF NOT EXISTS consentimentos (
 );
 CREATE INDEX IF NOT EXISTS consentimentos_anon ON consentimentos (anon_id);
 
+-- Versão dos dados: um contador que toda escrita em eventos e vínculos
+-- incrementa. O cache do painel compara este número (ver app/main.py).
+CREATE TABLE IF NOT EXISTS versao (n INTEGER NOT NULL);
+INSERT INTO versao SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM versao);
+CREATE TRIGGER IF NOT EXISTS versao_ev_i AFTER INSERT ON eventos BEGIN UPDATE versao SET n = n + 1; END;
+CREATE TRIGGER IF NOT EXISTS versao_ev_d AFTER DELETE ON eventos BEGIN UPDATE versao SET n = n + 1; END;
+CREATE TRIGGER IF NOT EXISTS versao_ev_u AFTER UPDATE ON eventos BEGIN UPDATE versao SET n = n + 1; END;
+CREATE TRIGGER IF NOT EXISTS versao_vi_i AFTER INSERT ON vinculos BEGIN UPDATE versao SET n = n + 1; END;
+CREATE TRIGGER IF NOT EXISTS versao_vi_d AFTER DELETE ON vinculos BEGIN UPDATE versao SET n = n + 1; END;
+
 -- Pedido de exclusão aguardando confirmação pelo código enviado ao e-mail.
 -- Guarda o HMAC do código, nunca o código; expira em 15 minutos e aceita
 -- no máximo 5 tentativas.

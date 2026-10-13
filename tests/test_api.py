@@ -36,6 +36,7 @@ def cliente():
             con.execute(f"DELETE FROM {tabela}")
     con.close()
     limite.zerar()
+    main._cache_painel.clear()
     with TestClient(main.app) as c:
         yield c
 
@@ -187,3 +188,32 @@ def test_atras_de_proxy_vale_o_ip_que_o_proxy_acrescentou(cliente, monkeypatch):
         for i in range(61)
     ]
     assert codigos[60] == 429
+
+
+def test_painel_usa_cache_ate_os_dados_mudarem(cliente, monkeypatch):
+    chamadas = []
+    original = main.calcular_painel
+    monkeypatch.setattr(main, "calcular_painel", lambda con, j: chamadas.append(j) or original(con, j))
+    aceitar(cliente, "aparelho-1")
+    cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "conversao", "valor": 10})
+    cliente.get("/api/painel", headers=ADMIN)
+    cliente.get("/api/painel", headers=ADMIN)
+    assert len(chamadas) == 1
+    cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "conversao", "valor": 10})
+    p = cliente.get("/api/painel", headers=ADMIN).json()
+    assert len(chamadas) == 2 and p["resumo"]["conversoes"] == 2
+    cliente.get("/api/painel?janela_dias=7", headers=ADMIN)
+    assert len(chamadas) == 3
+
+
+def test_cache_percebe_troca_da_ultima_linha(cliente):
+    # Sem AUTOINCREMENT, o id apagado volta: contagem e ids não bastam.
+    aceitar(cliente, "aparelho-1")
+    cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "conversao", "valor": 10})
+    antes = cliente.get("/api/painel", headers=ADMIN).json()["resumo"]["receita"]
+    con = conectar(main.CAMINHO_BANCO)
+    with con:
+        con.execute("DELETE FROM eventos WHERE id = (SELECT MAX(id) FROM eventos)")
+    con.close()
+    cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "conversao", "valor": 99})
+    assert (antes, cliente.get("/api/painel", headers=ADMIN).json()["resumo"]["receita"]) == (10, 99)

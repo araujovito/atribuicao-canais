@@ -22,6 +22,8 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import threading
+from collections import OrderedDict
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -184,7 +186,38 @@ def _serializar(resultados) -> dict:
 
 
 @app.get("/api/painel", dependencies=Admin)
-def painel(janela_dias: int = JANELA_DIAS, con: sqlite3.Connection = Banco):
+def painel(janela_dias: int = Query(JANELA_DIAS, ge=1, le=365), con: sqlite3.Connection = Banco):
+    chave = (janela_dias, versao_dos_dados(con))
+    with _trava_cache:
+        if chave in _cache_painel:
+            _cache_painel.move_to_end(chave)
+            return _cache_painel[chave]
+    resultado = calcular_painel(con, janela_dias)
+    with _trava_cache:
+        _cache_painel[chave] = resultado
+        while len(_cache_painel) > 8:
+            _cache_painel.popitem(last=False)
+    return resultado
+
+
+# Cache do painel. Recalcular monta as jornadas duas vezes (com e sem junção)
+# e roda os seis modelos em cada uma; com dezenas de milhares de eventos são
+# segundos por acesso, e o resultado só muda quando os dados mudam.
+_cache_painel: OrderedDict = OrderedDict()
+_trava_cache = threading.Lock()
+
+
+def versao_dos_dados(con: sqlite3.Connection) -> int:
+    """Contador mantido por triggers: muda a cada escrita em eventos e vínculos.
+
+    Descartado: assinatura por contagem, maior id e soma dos ids. Sem
+    AUTOINCREMENT, o SQLite reaproveita o maior id quando a última linha é
+    apagada, e "apaga a última, insere uma" deixaria a assinatura igual.
+    """
+    return con.execute("SELECT n FROM versao").fetchone()[0]
+
+
+def calcular_painel(con: sqlite3.Connection, janela_dias: int) -> dict:
     com = montar(con, janela_dias)
     sem = montar(con, janela_dias, juntar=False)
     visitas = con.execute(
