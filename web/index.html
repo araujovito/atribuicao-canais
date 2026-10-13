@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atribuição de canais</title>
+<style>
+  :root {
+    color-scheme: light;
+    --pagina: #f9f9f7; --superficie: #fcfcfb; --texto: #0b0b0b; --texto-2: #52514e; --mudo: #898781;
+    --grade: #e1e0d9; --eixo: #c3c2b7; --borda: rgba(11,11,11,0.10);
+    --serie-1: #2a78d6; --serie-2: #eb6834; --foco: #2a78d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --pagina: #0d0d0d; --superficie: #1a1a19; --texto: #f0efec; --texto-2: #c3c2b7; --mudo: #898781;
+      --grade: #2c2c2a; --eixo: #383835; --borda: rgba(255,255,255,0.10);
+      --serie-1: #3987e5; --serie-2: #d95926; --foco: #3987e5;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --pagina: #0d0d0d; --superficie: #1a1a19; --texto: #f0efec; --texto-2: #c3c2b7; --mudo: #898781;
+    --grade: #2c2c2a; --eixo: #383835; --borda: rgba(255,255,255,0.10);
+    --serie-1: #3987e5; --serie-2: #d95926; --foco: #3987e5;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--pagina); color: var(--texto); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1080px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.5rem; margin: 0; }
+  h2 { font-size: 1.05rem; margin: 0 0 2px; }
+  .sub { color: var(--texto-2); margin: 2px 0 0; font-size: .9rem; }
+  a { color: var(--foco); }
+  .filtros { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; align-items: end; }
+  .filtros label { display: flex; flex-direction: column; font-size: .8rem; color: var(--texto-2); gap: 4px; }
+  select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--eixo); background: var(--superficie); color: var(--texto); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .tile, .cartao { background: var(--superficie); border: 1px solid var(--borda); border-radius: 12px; padding: 14px 16px; }
+  .tile .rotulo { color: var(--texto-2); font-size: .82rem; }
+  .tile .valor { font-size: 1.6rem; font-weight: 600; }
+  .tile .nota { color: var(--mudo); font-size: .78rem; }
+  .cartao { margin-top: 16px; }
+  .legenda { display: flex; gap: 16px; font-size: .85rem; color: var(--texto-2); margin: 8px 0 4px; flex-wrap: wrap; }
+  .legenda span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; background: var(--cor); }
+  svg { display: block; width: 100%; height: auto; overflow: visible; }
+  svg text { font: 12px system-ui, sans-serif; fill: var(--texto-2); }
+  svg .tick { fill: var(--mudo); font-variant-numeric: tabular-nums; }
+  /* Só as faixas .alvo recebem o ponteiro; barras e textos por cima não podem roubar o hover. */
+  svg path, svg text, svg line { pointer-events: none; }
+  .alvo { fill: transparent; cursor: default; }
+  .alvo:hover, .alvo:focus { fill: var(--grade); opacity: .5; outline: none; }
+  .tabela-wrap { overflow-x: auto; }
+  table { border-collapse: separate; border-spacing: 2px; width: 100%; font-size: .85rem; }
+  th { font-weight: 500; color: var(--texto-2); text-align: right; padding: 6px 8px; vertical-align: bottom; }
+  th:first-child, td:first-child { text-align: left; }
+  td { padding: 8px; text-align: right; font-variant-numeric: tabular-nums; border-radius: 4px; }
+  td.cel { cursor: default; }
+  .nota-rodape { color: var(--texto-2); font-size: .85rem; margin-top: 10px; }
+  #tooltip {
+    position: fixed; pointer-events: none; background: var(--superficie); border: 1px solid var(--borda);
+    border-radius: 8px; padding: 8px 10px; font-size: .82rem; box-shadow: 0 4px 16px rgba(0,0,0,.12); z-index: 10; min-width: 160px;
+  }
+  #tooltip .titulo { color: var(--texto-2); margin-bottom: 4px; }
+  #tooltip .linha { display: flex; align-items: center; gap: 8px; }
+  #tooltip .linha i { width: 12px; height: 2px; background: var(--cor); display: inline-block; }
+  #tooltip .linha b { font-variant-numeric: tabular-nums; }
+  #tooltip .linha span { color: var(--texto-2); }
+  .carregando { opacity: .5; transition: opacity .2s; }
+  .vazio { color: var(--texto-2); padding: 24px 0; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Atribuição de canais</h1>
+  <p class="sub">Dados fictícios. Quanto cada canal recebe de crédito pelas vendas, por modelo, e o que muda ao juntar celular e computador da mesma pessoa.
+    <a href="/loja">Abrir a loja de demonstração</a>.</p>
+
+  <div class="filtros">
+    <label>Janela de retroatividade
+      <select id="janela"><option value="7">7 dias</option><option value="30" selected>30 dias</option><option value="90">90 dias</option></select>
+    </label>
+    <label>Medida
+      <select id="medida"><option value="receita" selected>Receita</option><option value="conversoes">Conversões</option></select>
+    </label>
+    <label>Modelo (gráfico de junção)
+      <select id="modelo"></select>
+    </label>
+  </div>
+
+  <div id="conteudo">
+    <div class="tiles" id="tiles"></div>
+
+    <div class="cartao">
+      <h2>Com e sem junção entre aparelhos</h2>
+      <p class="sub" id="sub-juncao"></p>
+      <div class="legenda">
+        <span style="--cor: var(--serie-1)">Com junção (pessoa)</span>
+        <span style="--cor: var(--serie-2)">Sem junção (cada aparelho é uma pessoa)</span>
+      </div>
+      <div id="grafico-juncao"></div>
+    </div>
+
+    <div class="cartao">
+      <h2>Participação de cada canal, por modelo</h2>
+      <p class="sub" id="sub-matriz"></p>
+      <div class="tabela-wrap"><table id="matriz"></table></div>
+      <p class="nota-rodape">Atribuição mede participação no caminho, não causa. Nos dados fictícios, Display tem efeito zero na compra e ainda assim recebe crédito em todos os modelos, inclusive no Markov, porque abre jornadas. Efeito causal só se mede com grupo de controle (teste de incrementalidade).</p>
+    </div>
+
+    <div class="cartao">
+      <h2>Visitas de entrada por canal e aparelho</h2>
+      <div class="tabela-wrap"><table id="visitas"></table></div>
+    </div>
+  </div>
+  <p class="vazio" id="vazio" hidden>Sem dados ainda. Rode <code>python scripts/gerar_dados.py</code> ou use a <a href="/loja">loja</a>.</p>
+</main>
+<div id="tooltip" hidden></div>
+
+<script>
+(function () {
+  "use strict";
+  var RAMPA_CLARA = ["#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec", "#5598e7", "#3987e5", "#2a78d6", "#256abf", "#1c5cab", "#184f95"];
+  var RAMPA_ESCURA = ["#0d366b", "#104281", "#184f95", "#1c5cab", "#256abf", "#2a78d6", "#3987e5", "#5598e7", "#6da7ec", "#86b6ef", "#9ec5f4"];
+  var CURTOS = {
+    primeiro_toque: "Primeiro toque", ultimo_toque: "Último toque", linear: "Linear",
+    decaimento_temporal: "Decaimento", posicao: "Posição", markov: "Markov",
+  };
+  var dados = null;
+  var el = function (id) { return document.getElementById(id); };
+  var SVGNS = "http://www.w3.org/2000/svg";
+
+  function escuro() {
+    var t = document.documentElement.dataset.theme;
+    if (t) return t === "dark";
+    return matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  function formatar(v, medida) {
+    if (medida === "receita") return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+    return v.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+  }
+  function compacto(v, medida) {
+    var s = v >= 1000 ? (v / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " mil" : Math.round(v).toLocaleString("pt-BR");
+    return medida === "receita" ? "R$ " + s : s;
+  }
+  function svg(tag, attrs, pai) {
+    var n = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    if (pai) pai.appendChild(n);
+    return n;
+  }
+
+  // --- tooltip --------------------------------------------------------------
+  var tip = el("tooltip");
+  function mostrarTip(ev, titulo, linhas) {
+    tip.replaceChildren();
+    var t = document.createElement("div"); t.className = "titulo"; t.textContent = titulo; tip.appendChild(t);
+    linhas.forEach(function (l) {
+      var d = document.createElement("div"); d.className = "linha";
+      if (l.cor) { var i = document.createElement("i"); i.style.setProperty("--cor", l.cor); d.appendChild(i); }
+      var b = document.createElement("b"); b.textContent = l.valor; d.appendChild(b);
+      var s = document.createElement("span"); s.textContent = l.rotulo; d.appendChild(s);
+      tip.appendChild(d);
+    });
+    tip.hidden = false;
+    var r = ev.target.getBoundingClientRect ? ev.target.getBoundingClientRect() : null;
+    var x = ev.clientX || (r ? r.right : 0), y = ev.clientY || (r ? r.top : 0);
+    var w = tip.offsetWidth, h = tip.offsetHeight;
+    tip.style.left = Math.min(x + 14, innerWidth - w - 8) + "px";
+    tip.style.top = Math.max(8, Math.min(y + 14, innerHeight - h - 8)) + "px";
+  }
+  function esconderTip() { tip.hidden = true; }
+
+  // --- dados ----------------------------------------------------------------
+  function carregar() {
+    el("conteudo").classList.add("carregando");
+    fetch("/api/painel?janela_dias=" + el("janela").value)
+      .then(function (r) { return r.json(); })
+      .then(function (d) { dados = d; desenhar(); })
+      .finally(function () { el("conteudo").classList.remove("carregando"); });
+  }
+
+  function canaisPresentes() {
+    var vistos = {};
+    Object.keys(dados.modelos).forEach(function (m) {
+      ["modelos", "sem_juncao"].forEach(function (b) {
+        Object.keys(dados[b][m].conversoes).forEach(function (c) { vistos[c] = true; });
+      });
+    });
+    return dados.canais.filter(function (c) { return vistos[c]; });
+  }
+
+  function desenhar() {
+    var r = dados.resumo;
+    el("vazio").hidden = r.conversoes > 0;
+    el("conteudo").hidden = r.conversoes === 0;
+    if (!r.conversoes) return;
+    var sel = el("modelo");
+    if (!sel.options.length) {
+      Object.keys(dados.modelos).forEach(function (m) {
+        var o = document.createElement("option"); o.value = m; o.textContent = dados.modelos[m].nome;
+        if (m === "ultimo_toque") o.selected = true;
+        sel.appendChild(o);
+      });
+    }
+    desenharTiles(r);
+    desenharJuncao();
+    desenharMatriz();
+    desenharVisitas();
+  }
+
+  function desenharTiles(r) {
+    var tiles = [
+      ["Conversões", r.conversoes.toLocaleString("pt-BR"), "na janela de " + r.janela_dias + " dias"],
+      ["Receita", formatar(r.receita, "receita"), ""],
+      ["Aparelhos", r.aparelhos.toLocaleString("pt-BR"), r.pessoas_identificadas.toLocaleString("pt-BR") + " pessoas identificadas"],
+      ["Conversões entre aparelhos", r.conversoes_entre_aparelhos.toLocaleString("pt-BR"),
+        (100 * r.conversoes_entre_aparelhos / r.conversoes).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "% das conversões"],
+      ["Aparelhos compartilhados", r.aparelhos_ambiguos.toLocaleString("pt-BR"), "ficam anônimos, sem fundir pessoas"],
+    ];
+    var c = el("tiles"); c.replaceChildren();
+    tiles.forEach(function (t) {
+      var d = document.createElement("div"); d.className = "tile";
+      ["rotulo", "valor", "nota"].forEach(function (cls, i) {
+        var s = document.createElement("div"); s.className = cls; s.textContent = t[i]; d.appendChild(s);
+      });
+      c.appendChild(d);
+    });
+  }
+
+  // Barras horizontais pareadas: com junção (série 1) e sem (série 2).
+  function desenharJuncao() {
+    var medida = el("medida").value, modelo = el("modelo").value;
+    var com = dados.modelos[modelo][medida], sem = dados.sem_juncao[modelo][medida];
+    var canais = canaisPresentes().slice().sort(function (a, b) { return (com[b] || 0) - (com[a] || 0); });
+    el("sub-juncao").textContent = dados.modelos[modelo].nome + " · " + (medida === "receita" ? "receita atribuída" : "conversões atribuídas") +
+      ". A diferença é o crédito que muda de canal quando o celular e o computador viram a mesma pessoa.";
+
+    var largura = Math.max(320, el("grafico-juncao").clientWidth || 640);
+    var esq = Math.min(130, largura * 0.3), dir = 64, barra = 10, vao = 2, banda = 34;
+    var alt = canais.length * banda + 28;
+    var max = 0;
+    canais.forEach(function (c) { max = Math.max(max, com[c] || 0, sem[c] || 0); });
+    // Menor passo "redondo" que dá no máximo 5 divisões: o eixo termina logo depois da maior barra.
+    var passo = Math.pow(10, Math.floor(Math.log10(max || 1)) - 1);
+    [1, 2, 2.5, 5, 10, 20, 25, 50].some(function (m) { if (max / (passo * m) <= 5) { passo *= m; return true; } });
+    var topo = Math.ceil(max / passo) * passo || 1;
+    var x = function (v) { return esq + (largura - esq - dir) * v / topo; };
+
+    var s = svg("svg", { viewBox: "0 0 " + largura + " " + alt, role: "img", "aria-label": "Crédito por canal com e sem junção entre aparelhos" });
+    for (var v = 0; v <= topo + 1e-9; v += passo) {
+      svg("line", { x1: x(v), x2: x(v), y1: 0, y2: alt - 22, stroke: v === 0 ? "var(--eixo)" : "var(--grade)", "stroke-width": 1 }, s);
+      svg("text", { x: x(v), y: alt - 6, "text-anchor": "middle", class: "tick" }, s).textContent = compacto(v, medida);
+    }
+    function barraPath(y, v) {
+      var x0 = x(0), x1 = x(v), r = Math.min(4, Math.max(0, x1 - x0));
+      if (x1 - x0 < 0.5) return "";
+      return "M" + x0 + "," + y + "H" + (x1 - r) + "Q" + x1 + "," + y + " " + x1 + "," + (y + r) +
+        "V" + (y + barra - r) + "Q" + x1 + "," + (y + barra) + " " + (x1 - r) + "," + (y + barra) + "H" + x0 + "Z";
+    }
+    canais.forEach(function (c, i) {
+      var y0 = i * banda + 4;
+      var a = com[c] || 0, b = sem[c] || 0;
+      svg("text", { x: esq - 8, y: y0 + barra + 4, "text-anchor": "end" }, s).textContent = c;
+      var p1 = barraPath(y0 + 2, a); if (p1) svg("path", { d: p1, fill: "var(--serie-1)" }, s);
+      var p2 = barraPath(y0 + 2 + barra + vao, b); if (p2) svg("path", { d: p2, fill: "var(--serie-2)" }, s);
+      var dif = a - b;
+      if (Math.abs(dif) >= topo * 0.02) {
+        svg("text", { x: x(Math.max(a, b)) + 6, y: y0 + barra + 6 }, s).textContent = (dif > 0 ? "+" : "−") + compacto(Math.abs(dif), medida);
+      }
+      var alvo = svg("rect", { x: 0, y: y0 - 4, width: largura, height: banda, class: "alvo", tabindex: 0, "aria-label": c }, s);
+      alvo.style.opacity = 0;
+      var linhas = [
+        { cor: "var(--serie-1)", valor: formatar(a, medida), rotulo: "com junção" },
+        { cor: "var(--serie-2)", valor: formatar(b, medida), rotulo: "sem junção" },
+        { valor: (dif >= 0 ? "+" : "−") + formatar(Math.abs(dif), medida), rotulo: "diferença" },
+      ];
+      ["pointermove", "focus"].forEach(function (e) { alvo.addEventListener(e, function (ev) { alvo.style.opacity = 0.35; mostrarTip(ev, c, linhas); }); });
+      ["pointerleave", "blur"].forEach(function (e) { alvo.addEventListener(e, function () { alvo.style.opacity = 0; esconderTip(); }); });
+    });
+    // As áreas de hover ficam por baixo das barras para não cobri-las.
+    Array.prototype.forEach.call(s.querySelectorAll(".alvo"), function (a) { s.insertBefore(a, s.firstChild); });
+    el("grafico-juncao").replaceChildren(s);
+  }
+
+  // Matriz canal × modelo: % do total, rampa sequencial azul.
+  function desenharMatriz() {
+    var medida = el("medida").value;
+    var modelos = Object.keys(dados.modelos), canais = canaisPresentes();
+    el("sub-matriz").textContent = "Percentual da " + (medida === "receita" ? "receita" : "quantidade de conversões") +
+      " que cada modelo dá a cada canal (com junção). Cor mais forte, mais crédito. Último toque ignora Direto; decaimento usa meia-vida de 7 dias; posição é 40/20/40; Markov usa o efeito de remoção.";
+    var totais = {}, max = 0;
+    modelos.forEach(function (m) {
+      var t = 0, v = dados.modelos[m][medida];
+      Object.keys(v).forEach(function (c) { t += v[c]; });
+      totais[m] = t;
+      canais.forEach(function (c) { max = Math.max(max, (v[c] || 0) / (t || 1)); });
+    });
+    var rampa = escuro() ? RAMPA_ESCURA : RAMPA_CLARA;
+    var tab = el("matriz"); tab.replaceChildren();
+    var cab = tab.insertRow(), th = document.createElement("th"); th.textContent = "Canal"; cab.appendChild(th);
+    modelos.forEach(function (m) {
+      var h = document.createElement("th"); h.textContent = CURTOS[m] || dados.modelos[m].nome; h.title = dados.modelos[m].nome; cab.appendChild(h);
+    });
+    canais.forEach(function (c) {
+      var tr = tab.insertRow(), td0 = tr.insertCell(); td0.textContent = c;
+      modelos.forEach(function (m) {
+        var v = dados.modelos[m][medida][c] || 0, frac = v / (totais[m] || 1);
+        var passo = Math.min(rampa.length - 1, Math.round((frac / (max || 1)) * (rampa.length - 1)));
+        var td = tr.insertCell();
+        td.className = "cel";
+        td.textContent = (100 * frac).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%";
+        td.style.background = rampa[passo];
+        // Texto sobre o preenchimento: branco nos passos escuros, tinta nos claros.
+        var corEscura = escuro() ? passo <= 5 : passo >= 6;
+        td.style.color = corEscura ? "#ffffff" : "#0b0b0b";
+        td.tabIndex = 0;
+        var linhas = [{ valor: formatar(v, medida), rotulo: dados.modelos[m].nome }];
+        td.addEventListener("pointermove", function (ev) { mostrarTip(ev, c, linhas); });
+        td.addEventListener("focus", function (ev) { mostrarTip(ev, c, linhas); });
+        td.addEventListener("pointerleave", esconderTip);
+        td.addEventListener("blur", esconderTip);
+      });
+    });
+  }
+
+  function desenharVisitas() {
+    var por = {}, aparelhos = ["celular", "computador"];
+    dados.visitas.forEach(function (v) { (por[v.canal] = por[v.canal] || {})[v.aparelho] = v.n; });
+    var tab = el("visitas"); tab.replaceChildren();
+    var cab = tab.insertRow();
+    ["Canal", "Celular", "Computador", "% celular"].forEach(function (t) { var h = document.createElement("th"); h.textContent = t; cab.appendChild(h); });
+    dados.canais.filter(function (c) { return por[c]; }).forEach(function (c) {
+      var tr = tab.insertRow(); tr.insertCell().textContent = c;
+      var cel = por[c].celular || 0, pc = por[c].computador || 0;
+      [cel, pc].forEach(function (n) { tr.insertCell().textContent = n.toLocaleString("pt-BR"); });
+      tr.insertCell().textContent = (100 * cel / ((cel + pc) || 1)).toLocaleString("pt-BR", { maximumFractionDigits: 0 }) + "%";
+    });
+  }
+
+  ["janela"].forEach(function (id) { el(id).addEventListener("change", carregar); });
+  ["medida", "modelo"].forEach(function (id) { el(id).addEventListener("change", function () { if (dados) desenhar(); }); });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { if (dados) desenhar(); });
+  var redim; addEventListener("resize", function () { clearTimeout(redim); redim = setTimeout(function () { if (dados) desenharJuncao(); }, 150); });
+  carregar();
+})();
+</script>
+</body>
+</html>

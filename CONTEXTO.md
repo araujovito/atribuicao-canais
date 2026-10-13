@@ -57,7 +57,7 @@ têm partes com licenças que restringem oferecer o produto como serviço a terc
 | 4 Atribuição (5 modelos de regra + Markov) | `app/atribuicao.py` | feito |
 | 11 Consentimento + privacidade (HMAC, exclusão, retenção) | `web/loja.html`, `app/privacidade.py`, `app/banco.py`, `app/main.py` | feito |
 | Montagem das jornadas (janela de 30 dias) | `app/jornadas.py` | feito |
-| Painel comparando modelos | `web/index.html` | a fazer (API `/api/painel` pronta) |
+| Painel comparando modelos | `web/index.html` | feito |
 | Dados fictícios para demonstração | `scripts/gerar_dados.py` | feito |
 | 5 Funis | — | possível próximo passo |
 | Publicação online para teste real (celular + computador) | Render/Railway | pendente: conta do Vitor |
@@ -86,6 +86,13 @@ cima.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Painel (`web/index.html`), sem biblioteca de gráficos:
+  indicadores, barras pareadas com e sem junção entre aparelhos, matriz canal
+  × modelo e visitas por aparelho. Paleta de duas séries validada para
+  daltonismo nos dois temas. Conferido em Chromium headless (claro, escuro e
+  390 px de largura, sem rolagem horizontal); hover testado na barra e na
+  célula, depois de corrigir barras que roubavam o ponteiro da área de hover.
 
 - **2026-10-13** — Dados fictícios (`scripts/gerar_dados.py`): 2.000
   pessoas, semente fixa, e-mails em `exemplo.invalid`. Com a semente padrão:
