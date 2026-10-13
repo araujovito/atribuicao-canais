@@ -55,7 +55,7 @@ têm partes com licenças que restringem oferecer o produto como serviço a terc
 | 1, 2 Coleta de visitas e UTMs | `web/rastreio.js`, `app/main.py`, `app/canais.py` | em andamento: `app/canais.py` feito |
 | 3 Junção de identidade entre aparelhos | `app/identidade.py` | feito |
 | 4 Atribuição (5 modelos de regra + Markov) | `app/atribuicao.py` | feito |
-| 11 Consentimento + privacidade (HMAC, exclusão, retenção) | `web/loja.html`, `app/privacidade.py`, `app/main.py` | a fazer |
+| 11 Consentimento + privacidade (HMAC, exclusão, retenção) | `web/loja.html`, `app/privacidade.py`, `app/banco.py`, `app/main.py` | em andamento: `privacidade.py` e esquema feitos |
 | Painel comparando modelos | `web/index.html` | a fazer |
 | Dados fictícios para demonstração | `scripts/gerar_dados.py` | a fazer |
 | 5 Funis | — | possível próximo passo |
@@ -80,6 +80,14 @@ cima.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Privacidade (`app/privacidade.py`) e esquema SQLite
+  (`app/banco.py`). HMAC-SHA256 com chave secreta em vez de hash puro
+  (e-mail tem pouca entropia). Exclusão do titular apaga também os eventos
+  anônimos de aparelho exclusivo dele, mas não os de aparelho compartilhado.
+  Retenção padrão de 13 meses (referência da CNIL; a LGPD não fixa prazo).
+  Esquema minimiza na origem: sem e-mail, sem IP, referrer só o host,
+  User-Agent só a classe do aparelho.
 
 - **2026-10-13** — Atribuição (`app/atribuicao.py`): primeiro toque, último
   toque não direto, linear, decaimento temporal (meia-vida 7 dias) e posição
