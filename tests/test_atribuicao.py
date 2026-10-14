@@ -88,6 +88,23 @@ def test_markov_primeira_ordem_nao_lembra_a_origem():
     assert efeitos["A"] == pytest.approx(efeitos["B"])
 
 
+def test_markov_segunda_ordem_lembra_a_origem():
+    # Mesmo caso: agora "C vindo de A" e "C vindo de B" são estados diferentes.
+    jornadas = [jornada("A", "C"), jornada("B", "C", converteu=False)]
+    efeitos = efeitos_remocao(jornadas, ordem=2)
+    assert efeitos["A"] == pytest.approx(1)
+    assert efeitos["B"] == pytest.approx(0)
+    r = atribuir(jornadas, "markov2").conversoes
+    assert r["A"] == pytest.approx(0.5) and r["C"] == pytest.approx(0.5) and r["B"] == pytest.approx(0)
+
+
+def test_markov_com_lacos():
+    # Canal repetido (A→A→B) cria laço na cadeia; o resultado ainda fecha.
+    jornadas = [jornada("A", "A", "B"), jornada("A", "B", converteu=False), jornada("B")]
+    for ordem in (1, 2):
+        assert sum(atribuir(jornadas, "markov" if ordem == 1 else "markov2").conversoes.values()) == pytest.approx(2)
+
+
 def test_jornadas_vazias():
     assert atribuir([], "markov").conversoes == {}
     assert atribuir([], "linear").conversoes == {}

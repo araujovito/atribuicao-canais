@@ -99,7 +99,8 @@ NOMES = {
     "linear": "Linear",
     "decaimento_temporal": "Decaimento temporal (meia-vida 7 dias)",
     "posicao": "Posição (40/20/40)",
-    "markov": "Markov (efeito de remoção)",
+    "markov": "Markov 1ª ordem (efeito de remoção)",
+    "markov2": "Markov 2ª ordem (lembra o canal anterior)",
 }
 
 
@@ -123,59 +124,73 @@ def atribuir_regra(jornadas: list[Jornada], modelo: str) -> Resultado:
 
 
 # --- Markov -----------------------------------------------------------------
+#
+# Estado = os últimos `ordem` canais. Na 1ª ordem, o estado é só o canal atual
+# e a cadeia não sabe de onde a pessoa veio (limitação escrita em teste). Na
+# 2ª ordem, o estado é o par (anterior, atual): "C vindo de A" e "C vindo de B"
+# viram estados diferentes, com probabilidades de conversão próprias.
+#
+# O preço é dado: com 9 canais são até 9 estados na 1ª ordem e até 90 na 2ª,
+# e cada transição é estimada com menos jornadas. Por isso as duas ficam no
+# painel, lado a lado, e a margem de erro (bootstrap) mostra a diferença.
+
+Estado = tuple[str, ...]
 
 
-def _transicoes(jornadas: list[Jornada]) -> dict[str, dict[str, float]]:
-    contagem: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+def _estados_do_caminho(canais: list[str], ordem: int) -> list[Estado]:
+    caminho = [INICIO, *canais]
+    return [tuple(caminho[max(0, i - ordem + 1): i + 1]) for i in range(len(caminho))]
+
+
+def _transicoes(jornadas: list[Jornada], ordem: int = 1) -> dict[Estado, dict]:
+    contagem: dict[Estado, dict] = defaultdict(lambda: defaultdict(int))
     for j in jornadas:
         if not j.toques:
             continue
-        caminho = [INICIO, *j.canais, CONVERSAO if j.converteu else NULO]
-        for de, para in zip(caminho, caminho[1:]):
+        estados = _estados_do_caminho(j.canais, ordem)
+        for de, para in zip(estados, estados[1:]):
             contagem[de][para] += 1
+        contagem[estados[-1]][CONVERSAO if j.converteu else NULO] += 1
     return {
         de: {para: n / sum(destinos.values()) for para, n in destinos.items()}
         for de, destinos in contagem.items()
     }
 
 
-def _prob_conversao(trans: dict[str, dict[str, float]], removido: str | None = None) -> float:
+def _prob_conversao(trans: dict[Estado, dict], removido: str | None = None) -> float:
     """Probabilidade de sair de (início) e chegar em (conversão).
 
-    Sistema linear p(s) = soma_t T(s,t) p(t), com p(conversão)=1 e p(nulo)=0.
-    Remover um canal = toda transição para ele vai para (nulo). Resolvido por
-    eliminação de Gauss: são no máximo uma dúzia de estados, não vale trazer
-    numpy só para isso.
+    p(s) = soma_t T(s,t) p(t), com p(conversão)=1 e p(nulo)=0. Remover um
+    canal = todo estado que o contém vira (nulo).
+
+    Resolvido por Gauss-Seidel, não por eliminação de Gauss: a matriz é
+    esparsa (cada estado leva a poucos outros), e com os ~90 estados da 2ª
+    ordem a eliminação em Python puro custaria segundos por chamada — e o
+    bootstrap chama centenas de vezes. Converge porque toda jornada termina
+    em conversão ou nulo (cadeia absorvente).
     """
-    estados = [s for s in trans if s != removido]
-    idx = {s: i for i, s in enumerate(estados)}
-    n = len(estados)
-    a = [[0.0] * (n + 1) for _ in range(n)]
-    for s, i in idx.items():
-        a[i][i] = 1.0
-        for t, p in trans[s].items():
-            if t == CONVERSAO:
-                a[i][n] += p
-            elif t in idx:  # (nulo) e o canal removido contribuem 0
-                a[i][idx[t]] -= p
-    for col in range(n):
-        piv = max(range(col, n), key=lambda r: abs(a[r][col]))
-        a[col], a[piv] = a[piv], a[col]
-        if abs(a[col][col]) < 1e-12:
-            continue
-        for r in range(n):
-            if r != col and a[r][col]:
-                f = a[r][col] / a[col][col]
-                for c in range(col, n + 1):
-                    a[r][c] -= f * a[col][c]
-    i = idx[INICIO]
-    return a[i][n] / a[i][i] if abs(a[i][i]) > 1e-12 else 0.0
+    vivos = [e for e in trans if removido not in e]
+    p = dict.fromkeys(vivos, 0.0)
+    for _ in range(10_000):
+        delta = 0.0
+        for e in vivos:
+            novo = 0.0
+            for t, pr in trans[e].items():
+                if t == CONVERSAO:
+                    novo += pr
+                elif t != NULO and t in p:
+                    novo += pr * p[t]
+            delta = max(delta, abs(novo - p[e]))
+            p[e] = novo
+        if delta < 1e-12:
+            break
+    return p.get((INICIO,), 0.0)
 
 
-def efeitos_remocao(jornadas: list[Jornada]) -> dict[str, float]:
+def efeitos_remocao(jornadas: list[Jornada], ordem: int = 1) -> dict[str, float]:
     """Queda relativa na probabilidade de conversão ao remover cada canal."""
-    trans = _transicoes(jornadas)
-    if INICIO not in trans:
+    trans = _transicoes(jornadas, ordem)
+    if (INICIO,) not in trans:
         return {}
     base = _prob_conversao(trans)
     if base == 0:
@@ -184,13 +199,13 @@ def efeitos_remocao(jornadas: list[Jornada]) -> dict[str, float]:
     return {c: (base - _prob_conversao(trans, removido=c)) / base for c in sorted(canais)}
 
 
-def atribuir_markov(jornadas: list[Jornada]) -> Resultado:
+def atribuir_markov(jornadas: list[Jornada], ordem: int = 1) -> Resultado:
     """Divide conversões e receita totais na proporção do efeito de remoção.
 
     A receita usa a mesma proporção das conversões: a cadeia modela SE a
     pessoa converte, não QUANTO gasta.
     """
-    efeitos = efeitos_remocao(jornadas)
+    efeitos = efeitos_remocao(jornadas, ordem)
     soma = sum(efeitos.values())
     total_conv = sum(1 for j in jornadas if j.converteu and j.toques)
     total_rec = sum(j.valor for j in jornadas if j.converteu and j.toques)
@@ -204,7 +219,9 @@ def atribuir_markov(jornadas: list[Jornada]) -> Resultado:
 
 def atribuir(jornadas: list[Jornada], modelo: str) -> Resultado:
     if modelo == "markov":
-        return atribuir_markov(jornadas)
+        return atribuir_markov(jornadas, ordem=1)
+    if modelo == "markov2":
+        return atribuir_markov(jornadas, ordem=2)
     return atribuir_regra(jornadas, modelo)
 
 

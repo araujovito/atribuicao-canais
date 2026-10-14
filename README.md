@@ -66,7 +66,7 @@ inteira numa pessoa só.
 
 **Modelos.** Primeiro toque, último toque não direto (convenção do GA4),
 linear, decaimento temporal (meia-vida de 7 dias), posição 40/20/40 e Markov
-de primeira ordem com efeito de remoção. Um teste garante que todo modelo
+de 1ª e de 2ª ordem com efeito de remoção. Um teste garante que todo modelo
 distribui exatamente as conversões e a receita existentes.
 
 **Privacidade.** HMAC-SHA256 com chave em vez de hash puro, porque e-mail tem
@@ -96,9 +96,9 @@ desmentiu.
 
 - Sem login ou formulário, não há junção confiável entre aparelhos. O que
   promete isso usa dados de terceiros ou fingerprinting.
-- O Markov é de primeira ordem: o estado não lembra de onde a pessoa veio
-  (limitação escrita como teste em `tests/test_atribuicao.py`). As evoluções
-  possíveis são uma ordem maior ou valores de Shapley.
+- O Markov de 1ª ordem não lembra de onde a pessoa veio (limitação escrita
+  como teste em `tests/test_atribuicao.py`). O de 2ª ordem lembra, mas estima
+  ~74 estados em vez de 9 com o mesmo volume de dados; os dois estão no painel.
 - SQLite no protótipo. Em produção, seria Postgres ou um banco analítico
   atrás de uma fila de eventos, com a coleta podendo ir para o RudderStack e
   a análise para o PostHog, e a lógica de atribuição daqui por cima.

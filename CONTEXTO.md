@@ -24,7 +24,7 @@ Uso: projeto de portfólio pessoal. Não usa dados reais de ninguém.
 | 6 | Gravação de sessão e mapa de cliques | ver o que a pessoa fez na tela | Hotjar, Microsoft Clarity, FullStory |
 | 7 | Coleta e distribuição de eventos (CDP) | coletar uma vez e mandar para vários destinos | Segment, mParticle |
 | 8 | Automação de marketing | formulários, e-mails, origem e pontuação do lead | RD Station, HubSpot, Marketo |
-| 9 | CRM | acompanhar o lead até virar cliente/venda | Salesforce, HubSpot, Pipedrive |
+| 9 | CRM | acompanhar o lead até virar cliente/venda | feito (Markov de 2ª ordem) |
 | 10 | Testes A/B e feature flags | testar versões de página | Optimizely, VWO, LaunchDarkly |
 | 11 | Gestão de consentimento (LGPD) | banner de cookies e registro do "sim" | OneTrust, Cookiebot, Adopt |
 | 12 | Inteligência de mercado (de fora) | estimar tráfego e ferramentas de outros sites | feito |
@@ -98,8 +98,12 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 - **Sem login ou formulário, não há junção confiável entre aparelhos.** O que
   promete isso usa dados de terceiros (Google/Meta) ou fingerprinting, que a LGPD e
   os navegadores combatem.
-- **Markov de primeira ordem:** o estado não lembra de onde a pessoa veio
-  (limitação documentada em teste). Evolução: ordem maior ou valores de Shapley.
+- **Markov de 1ª e 2ª ordem.** A 1ª não lembra de onde a pessoa veio
+  (limitação escrita em teste); a 2ª lembra, ao custo de estimar ~74 estados
+  em vez de 9 com o mesmo volume de jornadas. Os dois ficam no painel.
+  Shapley foi descartado: com a função de valor usual (conversões das
+  jornadas cujo conjunto de canais cabe na coalizão), ele se reduz a dividir
+  cada conversão igualmente entre os canais distintos da jornada.
 - **Atribuição não é causa.** No dado fictício, Display tem efeito zero na
   compra e mesmo assim recebe ~8% do crédito no Markov, tanto quanto no
   primeiro toque, porque abre jornadas. Todo modelo de atribuição mede
@@ -112,6 +116,11 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Item 9: Markov de ordem k; o painel mostra 1ª e 2ª.
+  Sistema resolvido por Gauss-Seidel (matriz esparsa) em vez de eliminação de
+  Gauss: 18 ms para a 2ª ordem com os dados fictícios. Shapley descartado
+  (ver Decisões e limites).
 
 - **2026-10-13** — Item 18: consentimento por finalidade (medição; junção
   entre aparelhos), caixas desmarcadas, "Aceitar tudo", "Salvar escolhas" e

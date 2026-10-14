@@ -135,7 +135,7 @@
   var RAMPA_ESCURA = ["#0d366b", "#104281", "#184f95", "#1c5cab", "#256abf", "#2a78d6", "#3987e5", "#5598e7", "#6da7ec", "#86b6ef", "#9ec5f4"];
   var CURTOS = {
     primeiro_toque: "Primeiro toque", ultimo_toque: "Último toque", linear: "Linear",
-    decaimento_temporal: "Decaimento", posicao: "Posição", markov: "Markov",
+    decaimento_temporal: "Decaimento", posicao: "Posição", markov: "Markov 1ª", markov2: "Markov 2ª",
   };
   var dados = null;
   var el = function (id) { return document.getElementById(id); };
@@ -319,7 +319,7 @@
     var medida = el("medida").value;
     var modelos = Object.keys(dados.modelos), canais = canaisPresentes();
     el("sub-matriz").textContent = "Percentual da " + (medida === "receita" ? "receita" : "quantidade de conversões") +
-      " que cada modelo dá a cada canal (com junção). Cor mais forte, mais crédito. Último toque ignora Direto; decaimento usa meia-vida de 7 dias; posição é 40/20/40; Markov usa o efeito de remoção.";
+      " que cada modelo dá a cada canal (com junção). Cor mais forte, mais crédito. Último toque ignora Direto; decaimento usa meia-vida de 7 dias; posição é 40/20/40; Markov usa o efeito de remoção (a 2ª ordem lembra o canal anterior).";
     var totais = {}, max = 0;
     modelos.forEach(function (m) {
       var t = 0, v = dados.modelos[m][medida];
