@@ -43,3 +43,21 @@ def test_dominio_inteiro_nao_casa_por_prefixo():
 def test_navegacao_interna_nao_e_origem():
     assert classificar(referrer="https://loja.exemplo.com.br/carrinho", host_proprio="exemplo.com.br") is None
     assert classificar(referrer="https://exemplo.com.br/", host_proprio="exemplo.com.br") is None
+
+
+@pytest.mark.parametrize(
+    ("fonte", "midia", "esperado"),
+    [
+        ("(direct)", "(none)", "Direto"),
+        ("<Other>", "organic", "Busca orgânica"),
+        ("baidu", "organic", "Busca orgânica"),  # buscador fora da lista: a mídia decide
+        ("<Other>", "referral", "Referência"),
+        ("<Other>", "<Other>", "Não identificado"),
+        ("(data deleted)", "(data deleted)", "Não identificado"),
+        ("google", "<Other>", "Busca orgânica"),
+        ("Partners", "affiliate", "Afiliados"),
+        ("google", "cpc", "Busca paga"),
+    ],
+)
+def test_vocabulario_do_ga4(fonte, midia, esperado):
+    assert classificar(utm_source=fonte, utm_medium=midia) == esperado

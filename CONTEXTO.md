@@ -130,6 +130,11 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 
 Mais recente primeiro.
 
+- **2026-10-13** — Dados reais (1/4): classificador entende o vocabulário
+  do GA4 (`(direct) / (none)`, valores anonimizados `<Other>` e
+  `(data deleted)`) e trata mídia `organic` como Busca orgânica mesmo sem
+  buscador conhecido. Canal novo: "Não identificado".
+
 - **2026-10-13** — Item 17: README reescrito (variáveis de ambiente,
   arquitetura nova, tabela incrementalidade × crédito, comparação com a
   verdade), imagens do painel e do banner em `docs/`, licença MIT. Números

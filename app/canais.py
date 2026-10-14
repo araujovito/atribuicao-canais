@@ -12,6 +12,9 @@ Decisões:
   muita conta só usa ele.
 - `fbclid` NÃO conta como pago: o Facebook acrescenta esse parâmetro também em
   links compartilhados organicamente. Tratar como pago infla o canal pago.
+- Valores apagados pela anonimização do GA4 (`<Other>`, `(data deleted)`)
+  viram "Não identificado" quando a mídia some; se só a fonte some, a mídia
+  ainda classifica (`<Other> / organic` é Busca orgânica).
 - Referrer do próprio site não é uma nova origem (é navegação interna); devolve
   None para quem chama ignorar o toque.
 """
@@ -43,7 +46,12 @@ CANAIS = (
     "Busca orgânica",
     "Referência",
     "Direto",
+    "Não identificado",
 )
+
+# Marcadores de valor apagado (anonimização do GA4, ex.: base pública do
+# Google) ou não preenchido. Não dá para classificar o que não existe.
+DESCONHECIDOS = {"<other>", "(data deleted)", "(not set)", "(not provided)"}
 
 
 def _host(url: str | None) -> str:
@@ -78,6 +86,19 @@ def classificar(
     """Devolve o nome do canal, ou None se a visita é navegação interna."""
     fonte = (utm_source or "").strip().lower()
     midia = (utm_medium or "").strip().lower()
+    # Visita direta no vocabulário do GA4 ("(direct) / (none)") = sem UTM.
+    if fonte == "(direct)" and midia in ("(none)", ""):
+        fonte = midia = ""
+    if midia in DESCONHECIDOS:
+        # Fonte conhecida ainda classifica (redes sociais, buscadores); sem
+        # fonte nem mídia, é "Não identificado" — melhor que chutar Referência.
+        if _casa(fonte, SOCIAIS):
+            return "Social orgânico"
+        if _casa(fonte, BUSCADORES):
+            return "Busca orgânica"
+        return "Não identificado"
+    if fonte in DESCONHECIDOS:
+        fonte = ""
 
     if midia or fonte:
         if midia in MIDIAS_PAGAS:
@@ -94,7 +115,9 @@ def classificar(
             return "Afiliados"
         if midia in MIDIAS_SOCIAIS or _casa(fonte, SOCIAIS):
             return "Social orgânico"
-        if midia == "organic" and _casa(fonte, BUSCADORES):
+        # Pela regra do GA4, mídia "organic" já é busca orgânica, mesmo com a
+        # fonte apagada ou fora da lista de buscadores.
+        if midia == "organic":
             return "Busca orgânica"
         if midia == "referral":
             return "Referência"
