@@ -57,6 +57,7 @@ têm partes com licenças que restringem oferecer o produto como serviço a terc
 | 4 Atribuição (5 modelos de regra + Markov) | `app/atribuicao.py` | feito |
 | 11 Consentimento + privacidade (HMAC, exclusão, retenção) | `web/loja.html`, `app/privacidade.py`, `app/banco.py`, `app/main.py` | feito |
 | Montagem das jornadas (janela de 30 dias) | `app/jornadas.py` | feito |
+| Dados reais: base pública de GA4 do Google (Google Merchandise Store) | `scripts/importar_ga4.py` | feito (amostra de 10%) |
 | Painel comparando modelos | `web/index.html` | feito |
 | Dados fictícios para demonstração | `scripts/gerar_dados.py` | feito |
 | 5 Funis | `app/funis.py`, `/api/etapa` | feito |
@@ -129,6 +130,12 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Dados reais (4/4): README com o que a base real mostra —
+  modelos quase concordam (72% das jornadas com compra têm um canal só,
+  contra 37% nos fictícios), conversão por canal varia 15× (Referência
+  6,2%, Busca paga 0,4%), 24% do crédito sem origem por causa da
+  anonimização, e o defeito das recompras que só o dado real revelou.
 
 - **2026-10-13** — Correção achada pelos dados reais: recompras perdiam os
   toques (a montagem zerava os toques a cada compra) e caíam no Direto de

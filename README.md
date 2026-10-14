@@ -8,7 +8,9 @@ O projeto implementa por dentro o que GA4, RD Station, Mixpanel e afins
 vendem prontos: coleta com consentimento por finalidade, classificação de
 canais, junção de identidade entre aparelhos, sete modelos de atribuição com
 margem de erro, funil e um teste de incrementalidade que mede o que os
-modelos não medem: causa. Os dados são fictícios.
+modelos não medem: causa. Roda sobre dados fictícios, que têm verdade
+conhecida, e sobre dados reais da loja oficial do Google, publicados pelo
+próprio Google.
 
 ![Painel: indicadores, crédito com e sem junção entre aparelhos e matriz canal × modelo com a coluna da verdade](docs/painel.png)
 
@@ -26,7 +28,12 @@ uv run uvicorn app.main:app --reload
 - Loja de demonstração: <http://localhost:8000/loja>. Abra no celular e no
   computador, aceite a junção, entre com o mesmo e-mail nos dois e compre em
   um deles.
-- Testes: `uv run pytest` (91 testes; o CI roda os mesmos a cada push).
+- Testes: `uv run pytest` (104 testes; o CI roda os mesmos a cada push).
+- Dados reais (opcional): com o Google Cloud SDK instalado e logado,
+  `uv run python scripts/importar_ga4.py --projeto SEU-PROJETO` traz uma
+  amostra de 10% da base pública de GA4 do Google para `dados/ga4.db`
+  (~1,7 GB lidos no BigQuery, dentro da cota gratuita). O painel ganha a
+  opção "Google Merchandise Store" no seletor de dados.
 - Para o teste de incrementalidade ter poder estatístico, gere mais gente:
   `uv run python scripts/gerar_dados.py --pessoas 20000 --substituir`. A
   primeira carga do painel leva ~20 s nesse volume e depois sai do cache.
@@ -36,6 +43,7 @@ uv run uvicorn app.main:app --reload
 | `ATRIBUICAO_CHAVE_HMAC` | chave da pseudonimização do e-mail | chave de desenvolvimento, com aviso |
 | `ATRIBUICAO_TOKEN_ADMIN` | token do painel e das rotas de manutenção | sorteado a cada subida e escrito no log |
 | `ATRIBUICAO_BANCO` | caminho do SQLite | `atribuicao.db` |
+| `ATRIBUICAO_BANCO_GA4` | banco importado do GA4 (aberto só para leitura) | `dados/ga4.db` |
 | `ATRIBUICAO_ORIGENS` | sites que podem hospedar o rastreador (CORS) | só o mesmo domínio |
 | `ATRIBUICAO_ATRAS_DE_PROXY` | `1` para ler o IP do `X-Forwarded-For` | desligado |
 | `ATRIBUICAO_REPLICAS` | réplicas do bootstrap | 100 |
@@ -75,6 +83,7 @@ plataforma de anúncios ─────────▶ sorteio tratamento/contro
 | API | `app/main.py` |
 | Rastreador, loja, política, painel | `web/` |
 | Dados fictícios | `scripts/gerar_dados.py` |
+| Dados reais (base pública de GA4 do Google) | `scripts/importar_ga4.py` |
 
 ## Decisões
 
@@ -148,6 +157,34 @@ compra (E-mail, Busca paga) aparecem perto do fim. Não prova que o último
 toque seja melhor em geral; mostra que o modelo baseado em dados não acerta
 automaticamente. Em dado real, a régua é o teste de incrementalidade.
 
+## O que os dados reais mostram
+
+Base pública de GA4 da Google Merchandise Store, a loja oficial de produtos
+do Google, de nov/2020 a jan/2021. Amostra determinística de 10% dos
+usuários: 27 mil aparelhos, 33,5 mil sessões e 554 compras. O Google
+anonimizou parte dos valores, e não há login, então a junção entre aparelhos
+e o teste de incrementalidade ficam de fora.
+
+![Participação por modelo nos dados reais da Google Merchandise Store](docs/painel-ga4.png)
+
+- **Os modelos quase concordam.** Busca orgânica fica entre 39% e 45% das
+  compras em todos os modelos, com os intervalos sobrepostos. O motivo:
+  72% das jornadas com compra têm um canal só, e aí todo modelo dá o crédito
+  ao mesmo lugar. Nos dados fictícios essa fração é de 37%, e é por isso que
+  lá os modelos divergem. A escolha do modelo pesa na proporção do tamanho
+  das jornadas.
+- **A conversão por canal varia 15 vezes.** Referência converte 6,2% das
+  visitas de entrada, Busca orgânica 2,3%, Direto 1,0% e Busca paga 0,4%
+  (750 visitas, 3 compras na amostra).
+- **24% do crédito não tem origem.** 31% das sessões vêm sem origem na base,
+  e "Não identificado" fica com 15% a 25% do crédito, conforme o modelo. É o
+  custo da anonimização e é mostrado, não escondido. Em dado coletado pelo
+  próprio rastreador, esse balde não existiria.
+- **Os dados reais acharam um defeito que os fictícios escondiam.** A
+  montagem das jornadas "consumia" os toques na primeira compra, e 97
+  recompras caíam no Direto de reserva. O gerador nunca cria recompra.
+  Corrigido; o Direto caiu de ~26% para 10–12% do crédito.
+
 ## Limites
 
 - Sem login ou formulário, não há junção confiável entre aparelhos. O que
@@ -159,6 +196,9 @@ automaticamente. Em dado real, a régua é o teste de incrementalidade.
 - SQLite no protótipo. Em produção, seria Postgres ou um banco analítico atrás
   de uma fila de eventos, com a coleta podendo ir para o RudderStack e a
   análise para o PostHog, e a lógica de atribuição daqui por cima.
+- Os dados do GA4 ficam fora do repositório (`dados/` está no `.gitignore`):
+  quem clona precisa rodar o importador com o próprio projeto do Google
+  Cloud, e a versão publicada no Render mostra só os dados fictícios.
 - O e-mail com o código de exclusão vai para o log do servidor
   (`app/correio.py` é o ponto a trocar por SMTP).
 
