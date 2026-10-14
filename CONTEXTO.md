@@ -130,6 +130,12 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 
 Mais recente primeiro.
 
+- **2026-10-13** — Dados reais (2/4): `scripts/importar_ga4.py` traz a
+  base pública de GA4 do Google (Google Merchandise Store, nov/2020 a
+  jan/2021) para `dados/ga4.db`, fora do git. Amostra determinística de
+  10% dos usuários: 27 mil usuários, 33,5 mil sessões, 554 compras. 31% das
+  sessões não têm origem na base ("Não identificado"); 10% são internas.
+
 - **2026-10-13** — Dados reais (1/4): classificador entende o vocabulário
   do GA4 (`(direct) / (none)`, valores anonimizados `<Other>` e
   `(data deleted)`) e trata mídia `organic` como Busca orgânica mesmo sem
