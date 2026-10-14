@@ -131,6 +131,10 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 
 Mais recente primeiro.
 
+- **2026-10-13** — Painel abre nos dados reais quando eles existem; os
+  fictícios ficam no seletor. O Vitor abriu o painel e não achou os dados
+  reais escondidos no seletor.
+
 - **2026-10-13** — Dados reais (4/4): README com o que a base real mostra —
   modelos quase concordam (72% das jornadas com compra têm um canal só,
   contra 37% nos fictícios), conversão por canal varia 15× (Referência

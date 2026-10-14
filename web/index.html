@@ -227,12 +227,19 @@
     fetch("/api/fontes", { headers: { Authorization: "Bearer " + lerToken() } })
       .then(function (r) { return r.ok ? r.json() : []; })
       .then(function (lista) {
-        var sel = el("fonte"), atual = sel.value;
+        var sel = el("fonte");
         sel.replaceChildren();
         lista.forEach(function (f) {
           var o = document.createElement("option"); o.value = f.id; o.textContent = f.nome; sel.appendChild(o);
         });
-        sel.value = atual;
+        // Com dados reais importados, eles abrem primeiro: são a pergunta de
+        // quem chega ("e com dado de verdade?"). Os fictícios ficam no seletor.
+        if (lista.some(function (f) { return f.id === "ga4"; })) {
+          sel.value = "ga4";
+          carregar();
+        } else {
+          sel.value = "ficticio";
+        }
       });
   }
 
