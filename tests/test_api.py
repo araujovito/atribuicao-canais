@@ -296,3 +296,14 @@ def test_fonte_ga4_somente_leitura(cliente):
     from app.banco import conectar_leitura
     with pytest.raises(sqlite3.OperationalError, match="readonly"):
         conectar_leitura(main.CAMINHO_GA4).execute("DELETE FROM eventos")
+
+
+def test_recompra_sem_visita_nova_usa_os_mesmos_toques(cliente):
+    aceitar(cliente, "aparelho-1")
+    cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "visita", "utm_source": "google", "utm_medium": "cpc"})
+    cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "conversao", "valor": 10})
+    cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "conversao", "valor": 20})
+    p = cliente.get("/api/painel", headers=ADMIN).json()
+    # Antes: a segunda compra perdia o toque e ia para o Direto de reserva.
+    assert p["modelos"]["ultimo_toque"]["receita"] == {"Busca paga": 30.0}
+    assert p["resumo"]["jornadas_sem_conversao"] == 0

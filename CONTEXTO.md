@@ -130,6 +130,11 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 
 Mais recente primeiro.
 
+- **2026-10-13** — Correção achada pelos dados reais: recompras perdiam os
+  toques (a montagem zerava os toques a cada compra) e caíam no Direto de
+  reserva. 97 recompras afetadas no GA4; Direto caiu de ~26% para 10–12% do
+  crédito. Dados fictícios não mudam (uma compra por pessoa).
+
 - **2026-10-13** — Dados reais (3/4): painel escolhe entre dados fictícios e
   Google Merchandise Store. O banco do GA4 abre só para leitura (a retenção de
   13 meses apagaria dados de 2020), valores em dólar, junção declarada como

@@ -6,6 +6,10 @@ Regras:
 - Cada conversão fecha uma jornada com os toques dentro da janela de
   retroatividade (30 dias por padrão, o mesmo do GA4 para conversões que não
   são de aquisição). Toques fora da janela não recebem crédito.
+- Os toques não são consumidos por uma conversão: uma recompra sem visita
+  nova olha a mesma janela e encontra os mesmos toques, como no GA4. A
+  primeira versão zerava os toques a cada compra, e nos dados reais do GA4
+  97 recompras caíam no Direto de reserva.
 - Conversão sem nenhum toque na janela vira uma jornada de um toque Direto,
   como no GA4: alguém chegou sem origem rastreável.
 - Toques depois da última conversão formam uma jornada que não converteu —
@@ -54,14 +58,15 @@ def montar(con: sqlite3.Connection, janela_dias: int = JANELA_DIAS, juntar: bool
     janela = timedelta(days=janela_dias)
     jornadas: list[Jornada] = []
     for dono, eventos in grupos.items():
-        pendentes: list[tuple[str, datetime, str]] = []
+        toques: list[tuple[str, datetime, str]] = []
+        depois_da_ultima_compra = 0  # índice em `toques` do primeiro toque após a última conversão
         for ev in eventos:
             t = tempo.ler(ev["momento"])
             if ev["tipo"] == "visita":
                 if ev["canal"]:
-                    pendentes.append((ev["canal"], t, ev["anon_id"]))
+                    toques.append((ev["canal"], t, ev["anon_id"]))
                 continue
-            na_janela = [p for p in pendentes if t - p[1] <= janela]
+            na_janela = [p for p in toques if t - p[1] <= janela]
             if not na_janela:
                 na_janela = [(DIRETO, t, ev["anon_id"])]
             jornadas.append(Jornada(
@@ -72,12 +77,13 @@ def montar(con: sqlite3.Connection, janela_dias: int = JANELA_DIAS, juntar: bool
                 pessoa=dono,
                 aparelhos=frozenset({a for _, _, a in na_janela} | {ev["anon_id"]}),
             ))
-            pendentes = []
-        if pendentes:
+            depois_da_ultima_compra = len(toques)
+        sobra = toques[depois_da_ultima_compra:]
+        if sobra:
             jornadas.append(Jornada(
-                toques=[(c, m) for c, m, _ in pendentes],
+                toques=[(c, m) for c, m, _ in sobra],
                 pessoa=dono,
-                aparelhos=frozenset(a for _, _, a in pendentes),
+                aparelhos=frozenset(a for _, _, a in sobra),
             ))
 
     n_aparelhos = con.execute("SELECT COUNT(DISTINCT anon_id) FROM eventos").fetchone()[0]
