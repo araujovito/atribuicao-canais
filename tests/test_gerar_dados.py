@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 
-from scripts.gerar_dados import gerar
+import pytest
+
+from scripts.gerar_dados import BancoComDados, gerar
 
 from app.banco import conectar
 from app.jornadas import montar
@@ -25,3 +27,14 @@ def test_ha_compras_entre_aparelhos_e_juncao_recupera_parte(tmp_path):
     assert stats["compras_entre_aparelhos"] > 0
     # Só quem fez login no celular é juntado: recupera parte, não tudo.
     assert 0 < m.conversoes_entre_aparelhos <= stats["compras_entre_aparelhos"]
+
+
+def test_nao_apaga_banco_com_dados_sem_pedir(tmp_path):
+    caminho = tmp_path / "b.db"
+    gerar(caminho, 50, 1, HOJE)
+    antes = conectar(caminho).execute("SELECT COUNT(*) FROM eventos").fetchone()[0]
+    with pytest.raises(BancoComDados):
+        gerar(caminho, 10, 2, HOJE)
+    assert conectar(caminho).execute("SELECT COUNT(*) FROM eventos").fetchone()[0] == antes
+    gerar(caminho, 10, 2, HOJE, substituir=True)
+    assert conectar(caminho).execute("SELECT COUNT(*) FROM eventos").fetchone()[0] != antes

@@ -26,6 +26,7 @@ de controle sem o anúncio).
 Uso:
     python scripts/gerar_dados.py                 # 2.000 pessoas em atribuicao.db
     python scripts/gerar_dados.py --pessoas 500 --banco outro.db
+    python scripts/gerar_dados.py --substituir    # apaga o que houver e gera de novo
 """
 
 from __future__ import annotations
@@ -74,9 +75,19 @@ def chance_de_compra(canais: list[str]) -> float:
     return min(p, 0.75)
 
 
-def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime) -> dict[str, int]:
+class BancoComDados(Exception):
+    pass
+
+
+def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime, substituir: bool = False) -> dict[str, int]:
     rng = random.Random(semente)
     con = conectar(caminho)
+    # O gerador começa apagando tudo. Num banco que já recebeu coleta da loja
+    # (ou de um site de verdade), isso perderia dado sem volta.
+    existentes = con.execute("SELECT COUNT(*) FROM eventos").fetchone()[0]
+    if existentes and not substituir:
+        con.close()
+        raise BancoComDados(f"{caminho} já tem {existentes} eventos; use --substituir para apagar e gerar de novo")
     with con:
         for tabela in ("eventos", "vinculos", "consentimentos"):
             con.execute(f"DELETE FROM {tabela}")
@@ -159,8 +170,12 @@ def main() -> None:
     ap.add_argument("--pessoas", type=int, default=2000)
     ap.add_argument("--semente", type=int, default=42)
     ap.add_argument("--banco", type=Path, default=Path(__file__).resolve().parent.parent / "atribuicao.db")
+    ap.add_argument("--substituir", action="store_true", help="apaga os dados que já existirem no banco")
     args = ap.parse_args()
-    stats = gerar(args.banco, args.pessoas, args.semente, agora())
+    try:
+        stats = gerar(args.banco, args.pessoas, args.semente, agora(), args.substituir)
+    except BancoComDados as e:
+        raise SystemExit(f"Nada foi alterado: {e}") from None
     print(f"{args.banco}: " + ", ".join(f"{k}={v}" for k, v in stats.items()))
 
 
