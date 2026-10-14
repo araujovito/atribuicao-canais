@@ -32,7 +32,7 @@ ADMIN = {"authorization": "Bearer token-de-teste"}
 def cliente():
     con = conectar(main.CAMINHO_BANCO)
     with con:
-        for tabela in ("eventos", "vinculos", "consentimentos"):
+        for tabela in ("eventos", "vinculos", "consentimentos", "etapas"):
             con.execute(f"DELETE FROM {tabela}")
     con.close()
     limite.zerar()
@@ -254,3 +254,14 @@ def test_migra_banco_da_primeira_versao(tmp_path):
     antigo.commit(); antigo.close()
     con = conectar(caminho)
     assert tuple(con.execute("SELECT aceito, juncao FROM consentimentos").fetchone()) == (1, 0)
+
+
+def test_etapa_exige_medicao_e_entra_no_painel(cliente):
+    assert cliente.post("/api/etapa", json={"anon_id": "aparelho-1", "etapa": "carrinho"}).status_code == 403
+    aceitar(cliente, "aparelho-1", juncao=False)
+    cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "visita", "utm_source": "google", "utm_medium": "cpc"})
+    assert cliente.post("/api/etapa", json={"anon_id": "aparelho-1", "etapa": "carrinho"}).status_code == 200
+    assert cliente.post("/api/etapa", json={"anon_id": "aparelho-1", "etapa": "outra"}).status_code == 422
+    cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "conversao", "valor": 10})
+    f = cliente.get("/api/painel", headers=ADMIN).json()["funil"]
+    assert f["por_canal"]["Busca paga"] == {"visita": 1, "login": 0, "carrinho": 1, "compra": 1}

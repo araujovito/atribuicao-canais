@@ -13,6 +13,7 @@
  * Uso: <script src="/web/rastreio.js"></script> e depois
  *   Rastreio.aceitar({ juncao: true|false }) / Rastreio.recusar() / Rastreio.revogar()
  *   Rastreio.identificar(email)       (login ou formulário)
+ *   Rastreio.etapa("carrinho")        (etapa do funil)
  *   Rastreio.converter(valor, email)  (compra)
  *   Rastreio.pedirExclusao(email) e Rastreio.excluirMeusDados(email, codigo)
  */
@@ -108,7 +109,16 @@
       return enviar("/api/consentimento", { anon_id: id, aceito: false, versao: VERSAO_TEXTO });
     },
 
+    // Etapa do funil (login, carrinho): é medição, não leva e-mail.
+    etapa: function (nome) {
+      if (!consentiu()) return Promise.resolve(null);
+      return enviar("/api/etapa", { anon_id: anonId(), etapa: nome });
+    },
+
+    // Login conta como etapa do funil com a medição; ligar o e-mail ao
+    // aparelho depende, à parte, da junção.
     identificar: function (email) {
+      Rastreio.etapa("login");
       if (!juntaAparelhos()) return Promise.resolve(null);
       return enviar("/api/identificar", { anon_id: anonId(), email: email });
     },

@@ -81,6 +81,9 @@ class BancoComDados(Exception):
 
 def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime, substituir: bool = False) -> dict[str, int]:
     rng = random.Random(semente)
+    # Gerador separado para as etapas do funil: sortear login e carrinho no
+    # mesmo gerador mudaria todos os números que já estão documentados.
+    rng_funil = random.Random(semente + 1)
     con = conectar(caminho)
     # O gerador começa apagando tudo. Num banco que já recebeu coleta da loja
     # (ou de um site de verdade), isso perderia dado sem volta.
@@ -89,10 +92,10 @@ def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime, substitui
         con.close()
         raise BancoComDados(f"{caminho} já tem {existentes} eventos; use --substituir para apagar e gerar de novo")
     with con:
-        for tabela in ("eventos", "vinculos", "consentimentos"):
+        for tabela in ("eventos", "vinculos", "consentimentos", "etapas"):
             con.execute(f"DELETE FROM {tabela}")
 
-    eventos, vinculos, consent = [], [], []
+    eventos, vinculos, consent, etapas = [], [], [], []
     pcs_compartilhados: list[str] = []
     stats = {"pessoas": n_pessoas, "compras": 0, "compras_entre_aparelhos": 0}
 
@@ -138,15 +141,23 @@ def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime, substitui
                             "celular" if ultimo_aparelho == celular else "computador", valor,
                             texto(t)))
             vinculos.append((ultimo_aparelho, pid, texto(t)))
+            etapas.append((ultimo_aparelho, "carrinho", texto(t - timedelta(minutes=rng_funil.uniform(2, 30)))))
             stats["compras"] += 1
             if perfil == "dois" and len(aparelhos_usados) > 1:
                 stats["compras_entre_aparelhos"] += 1
+        else:
+            # Abandono de carrinho: parte de quem não comprou chegou a montar um.
+            if aparelhos_usados and rng_funil.random() < 0.3:
+                etapas.append((ultimo_aparelho if ultimo_aparelho in aparelhos_usados else next(iter(aparelhos_usados)),
+                               "carrinho", texto(min(t, hoje))))
         # Login no celular: sem ele, não há como saber que é a mesma pessoa.
         if perfil == "dois" and rng.random() < 0.6:
             vinculos.append((celular, pid, texto(inicio)))
+            etapas.append((celular, "login", texto(inicio)))
         # Login no computador (área do cliente, lista de desejos) sem comprar.
         if computador and rng.random() < 0.3:
             vinculos.append((computador, pid, texto(inicio)))
+            etapas.append((computador, "login", texto(inicio)))
 
         for anon in aparelhos_usados | {ultimo_aparelho}:
             # Medição e junção: aqui todo mundo aceitou as duas, porque o
@@ -160,6 +171,7 @@ def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime, substitui
             eventos,
         )
         con.executemany("INSERT OR IGNORE INTO vinculos VALUES (?, ?, ?)", vinculos)
+        con.executemany("INSERT INTO etapas (anon_id, etapa, momento) VALUES (?, ?, ?)", etapas)
         con.executemany(
             "INSERT INTO consentimentos (anon_id, versao, aceito, juncao, momento) VALUES (?, ?, ?, ?, ?)", consent
         )

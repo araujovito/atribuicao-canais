@@ -4,6 +4,7 @@ Rotas:
     POST   /api/consentimento   registra o banner: medição e junção, cada uma à parte
     POST   /api/evento          visita de entrada ou conversão; exige consentimento
     POST   /api/identificar     login/formulário: liga o aparelho ao pseudônimo
+    POST   /api/etapa           etapa do funil (login, carrinho); exige medição
     GET    /api/painel          atribuição por modelo, com e sem junção [admin]
     POST   /api/titular/pedido  pede exclusão: envia código ao e-mail (LGPD art. 18)
     DELETE /api/titular         confirma a exclusão com o código
@@ -41,6 +42,7 @@ from app.limite import limitar
 from app.atribuicao import NOMES, comparar
 from app.banco import conectar
 from app.canais import CANAIS, classificar
+from app.funis import funil
 from app.incerteza import intervalos
 from app.jornadas import JANELA_DIAS, montar
 
@@ -143,6 +145,11 @@ class Evento(BaseModel):
     email: str | None = Field(default=None, max_length=254)
 
 
+class Etapa(BaseModel):
+    anon_id: str = Field(pattern=ANON_ID)
+    etapa: str = Field(pattern="^(login|carrinho)$")
+
+
 class Identificacao(BaseModel):
     anon_id: str = Field(pattern=ANON_ID)
     email: str = Field(min_length=3, max_length=254)
@@ -203,6 +210,16 @@ def registrar_evento(ev: Evento, request: Request, con: sqlite3.Connection = Ban
             ),
         )
     return {"ok": True, "canal": canal}
+
+
+@app.post("/api/etapa", dependencies=[Depends(limitar("etapa", 60, 60))])
+def registrar_etapa(e: Etapa, con: sqlite3.Connection = Banco):
+    # Etapa do funil é medição: não leva e-mail e não exige a junção.
+    if not consentimento(con, e.anon_id)[0]:
+        raise HTTPException(403, "sem consentimento registrado para este aparelho")
+    with con:
+        con.execute("INSERT INTO etapas (anon_id, etapa, momento) VALUES (?, ?, ?)", (e.anon_id, e.etapa, agora()))
+    return {"ok": True}
 
 
 @app.post("/api/identificar", dependencies=[Depends(limitar("identificar", 20, 60))])
@@ -268,6 +285,7 @@ def calcular_painel(con: sqlite3.Connection, janela_dias: int) -> dict:
         # o motivo de o cache existir.
         "intervalos": intervalos(com.jornadas, REPLICAS),
         "visitas": [dict(v) for v in visitas],
+        "funil": funil(con),
         "resumo": {
             "janela_dias": janela_dias,
             "aparelhos": com.aparelhos,

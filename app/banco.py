@@ -59,6 +59,16 @@ CREATE TABLE IF NOT EXISTS consentimentos (
 );
 CREATE INDEX IF NOT EXISTS consentimentos_anon ON consentimentos (anon_id);
 
+-- Etapas do funil que não são visita nem compra (login, carrinho). Ficam em
+-- tabela própria porque não entram na atribuição, só no funil.
+CREATE TABLE IF NOT EXISTS etapas (
+    id      INTEGER PRIMARY KEY,
+    anon_id TEXT NOT NULL,
+    etapa   TEXT NOT NULL CHECK (etapa IN ('login', 'carrinho')),
+    momento TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS etapas_anon ON etapas (anon_id);
+
 -- Versão dos dados: um contador que toda escrita em eventos e vínculos
 -- incrementa. O cache do painel compara este número (ver app/main.py).
 CREATE TABLE IF NOT EXISTS versao (n INTEGER NOT NULL);
@@ -68,6 +78,8 @@ CREATE TRIGGER IF NOT EXISTS versao_ev_d AFTER DELETE ON eventos BEGIN UPDATE ve
 CREATE TRIGGER IF NOT EXISTS versao_ev_u AFTER UPDATE ON eventos BEGIN UPDATE versao SET n = n + 1; END;
 CREATE TRIGGER IF NOT EXISTS versao_vi_i AFTER INSERT ON vinculos BEGIN UPDATE versao SET n = n + 1; END;
 CREATE TRIGGER IF NOT EXISTS versao_vi_d AFTER DELETE ON vinculos BEGIN UPDATE versao SET n = n + 1; END;
+CREATE TRIGGER IF NOT EXISTS versao_et_i AFTER INSERT ON etapas BEGIN UPDATE versao SET n = n + 1; END;
+CREATE TRIGGER IF NOT EXISTS versao_et_d AFTER DELETE ON etapas BEGIN UPDATE versao SET n = n + 1; END;
 
 -- Pedido de exclusão aguardando confirmação pelo código enviado ao e-mail.
 -- Guarda o HMAC do código, nunca o código; expira em 15 minutos e aceita

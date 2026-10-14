@@ -100,3 +100,14 @@ def test_cinco_tentativas_erradas_queimam_o_codigo(con):
 def test_codigo_nao_fica_gravado(con):
     codigo = pedir_exclusao(con, "ana@exemplo.com", agora=AGORA, chave_hmac=CHAVE)
     assert codigo not in str([tuple(r) for r in con.execute("SELECT * FROM pedidos_exclusao")])
+
+
+def test_exclusao_e_retencao_cobrem_etapas_do_funil(con):
+    ana = pseudonimo("ana@exemplo.com", CHAVE)
+    vinculo(con, "celular-ana", ana)
+    con.execute("INSERT INTO etapas (anon_id, etapa, momento) VALUES ('celular-ana', 'carrinho', ?)", (texto(AGORA),))
+    con.execute("INSERT INTO etapas (anon_id, etapa, momento) VALUES ('outro', 'login', ?)",
+                (texto(AGORA - timedelta(days=400)),))
+    excluir_titular(con, "ana@exemplo.com", CHAVE)
+    aplicar_retencao(con, agora=AGORA)
+    assert contar(con, "etapas") == 0

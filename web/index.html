@@ -121,6 +121,14 @@
     </div>
 
     <div class="cartao">
+      <h2>Funil por canal de entrada</h2>
+      <p class="sub">Pessoas que chegaram a cada etapa, pelo canal do primeiro toque. Funil aberto: login é opcional,
+        então quem compra sem entrar conta na compra mesmo sem ter passado pelo login.</p>
+      <div id="grafico-funil"></div>
+      <div class="tabela-wrap"><table id="funil"></table></div>
+    </div>
+
+    <div class="cartao">
       <h2>Visitas de entrada por canal e aparelho</h2>
       <div class="tabela-wrap"><table id="visitas"></table></div>
     </div>
@@ -239,6 +247,46 @@
     desenharJuncao();
     desenharMatriz();
     desenharVisitas();
+    desenharFunil();
+  }
+
+  var NOMES_ETAPAS = { visita: "Visita", login: "Login", carrinho: "Carrinho", compra: "Compra" };
+
+  // Funil total: barras horizontais de uma série, valor na ponta.
+  function desenharFunil() {
+    var f = dados.funil, etapas = f.etapas, total = f.total, base = total.visita || 1;
+    var largura = Math.max(320, el("grafico-funil").clientWidth || 640);
+    var esq = 80, dir = 120, banda = 30, barra = 18, alt = etapas.length * banda + 4;
+    var x = function (v) { return esq + (largura - esq - dir) * v / base; };
+    var s = svg("svg", { viewBox: "0 0 " + largura + " " + alt, role: "img", "aria-label": "Funil total" });
+    svg("line", { x1: esq, x2: esq, y1: 0, y2: alt, stroke: "var(--eixo)", "stroke-width": 1 }, s);
+    etapas.forEach(function (e, i) {
+      var y = i * banda + 4, v = total[e] || 0, x1 = x(v), r = Math.min(4, x1 - esq);
+      svg("text", { x: esq - 8, y: y + barra - 5, "text-anchor": "end" }, s).textContent = NOMES_ETAPAS[e];
+      if (x1 - esq > 0.5) {
+        svg("path", { fill: "var(--serie-1)", d: "M" + esq + "," + y + "H" + (x1 - r) + "Q" + x1 + "," + y + " " + x1 + "," + (y + r) +
+          "V" + (y + barra - r) + "Q" + x1 + "," + (y + barra) + " " + (x1 - r) + "," + (y + barra) + "H" + esq + "Z" }, s);
+      }
+      svg("text", { x: x1 + 6, y: y + barra - 5 }, s).textContent =
+        v.toLocaleString("pt-BR") + " · " + (100 * v / base).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%";
+    });
+    el("grafico-funil").replaceChildren(s);
+
+    var tab = el("funil"); tab.replaceChildren();
+    var cab = tab.insertRow();
+    ["Canal de entrada", "Visita", "Login", "Carrinho", "Compra", "Compra / visita"].forEach(function (t) {
+      var h = document.createElement("th"); h.textContent = t; cab.appendChild(h);
+    });
+    var linhas = dados.canais.filter(function (c) { return f.por_canal[c]; }).map(function (c) { return [c, f.por_canal[c]]; });
+    linhas.push(["Todos", total]);
+    linhas.forEach(function (l) {
+      var tr = tab.insertRow(), d = l[1];
+      var c0 = tr.insertCell(); c0.textContent = l[0]; if (l[0] === "Todos") c0.style.fontWeight = "600";
+      etapas.forEach(function (e) {
+        var td = tr.insertCell(); td.textContent = (d[e] || 0).toLocaleString("pt-BR");
+      });
+      tr.insertCell().textContent = (100 * (d.compra || 0) / (d.visita || 1)).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%";
+    });
   }
 
   function desenharTiles(r) {
@@ -382,7 +430,7 @@
   ["janela"].forEach(function (id) { el(id).addEventListener("change", carregar); });
   ["medida", "modelo"].forEach(function (id) { el(id).addEventListener("change", function () { if (dados) desenhar(); }); });
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { if (dados) desenhar(); });
-  var redim; addEventListener("resize", function () { clearTimeout(redim); redim = setTimeout(function () { if (dados) desenharJuncao(); }, 150); });
+  var redim; addEventListener("resize", function () { clearTimeout(redim); redim = setTimeout(function () { if (dados) { desenharJuncao(); desenharFunil(); } }, 150); });
   carregar();
 })();
 </script>

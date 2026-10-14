@@ -20,7 +20,7 @@ Uso: projeto de portfólio pessoal. Não usa dados reais de ninguém.
 | 2 | Rastreamento por UTM | saber qual link/campanha trouxe a visita | feito (token + piso de 30 dias) |
 | 3 | Junção de identidade entre aparelhos | mesma pessoa no celular e no computador | feito (`app/acesso.py`) |
 | 4 | Atribuição multicanal | quanto crédito cada canal recebe pela conversão | feito (`app/limite.py`) |
-| 5 | Análise de produto (funis, retenção) | onde as pessoas desistem no caminho | Mixpanel, Amplitude, Heap |
+| 5 | Análise de produto (funis, retenção) | onde as pessoas desistem no caminho | feito (`app/funis.py`) |
 | 6 | Gravação de sessão e mapa de cliques | ver o que a pessoa fez na tela | Hotjar, Microsoft Clarity, FullStory |
 | 7 | Coleta e distribuição de eventos (CDP) | coletar uma vez e mandar para vários destinos | Segment, mParticle |
 | 8 | Automação de marketing | formulários, e-mails, origem e pontuação do lead | RD Station, HubSpot, Marketo |
@@ -59,7 +59,7 @@ têm partes com licenças que restringem oferecer o produto como serviço a terc
 | Montagem das jornadas (janela de 30 dias) | `app/jornadas.py` | feito |
 | Painel comparando modelos | `web/index.html` | feito |
 | Dados fictícios para demonstração | `scripts/gerar_dados.py` | feito |
-| 5 Funis | — | possível próximo passo |
+| 5 Funis | `app/funis.py`, `/api/etapa` | feito |
 | Publicação online para teste real (celular + computador) | Render/Railway | pendente: conta do Vitor |
 
 A ideia é mostrar que entendemos **como** esses serviços funcionam por dentro,
@@ -116,6 +116,12 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Item 5: funil aberto visita → login → carrinho → compra
+  por canal de entrada (primeiro toque da pessoa juntada). Etapas em tabela
+  própria; exclusão e retenção cobrem a tabela. Loja ganhou carrinho. Nos
+  dados fictícios, Display tem a pior compra/visita (11,4%, contra 19,5% no
+  total), coerente com o efeito zero que o gerador dá a ele.
 
 - **2026-10-13** — Item 10: intervalo de 95% por bootstrap de pessoas
   (100 réplicas, ~3 s, coberto pelo cache). Leitura dos dados fictícios:

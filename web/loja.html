@@ -71,6 +71,10 @@
   <section>
     <h2>3. Comprar</h2>
     <div class="grade" id="produtos"></div>
+    <div class="linha" style="margin-top: 16px">
+      <button id="finalizar" disabled>Finalizar compra</button>
+      <span id="carrinho" class="aviso" style="margin: 0">Carrinho vazio.</span>
+    </div>
   </section>
 
   <section>
@@ -130,16 +134,35 @@
     origens.appendChild(a);
   });
 
+  var carrinho = [];
+  function brl(v) { return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" }); }
+  function totalCarrinho() { return carrinho.reduce(function (s, p) { return s + p[1]; }, 0); }
+  function atualizarCarrinho() {
+    document.getElementById("carrinho").textContent = carrinho.length
+      ? carrinho.length + (carrinho.length === 1 ? " item, " : " itens, ") + brl(totalCarrinho())
+      : "Carrinho vazio.";
+    document.getElementById("finalizar").disabled = !carrinho.length;
+  }
+  document.getElementById("finalizar").onclick = function () {
+    var email = document.getElementById("email").value || null;
+    Rastreio.converter(Math.round(totalCarrinho() * 100) / 100, email).then(function (r) {
+      carrinho = []; atualizarCarrinho();
+      mostrar(r ? "Compra registrada." : "Compra feita, mas sem rastreio (sem consentimento).");
+    });
+  };
+
   var produtos = document.getElementById("produtos");
   PRODUTOS.forEach(function (p) {
     var c = document.createElement("div");
     c.className = "cartao";
-    c.innerHTML = "<h2></h2><div class='preco'></div><button>Comprar</button>";
+    c.innerHTML = "<h2></h2><div class='preco'></div><button>Adicionar ao carrinho</button>";
     c.querySelector("h2").textContent = p[0];
-    c.querySelector(".preco").textContent = p[1].toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    c.querySelector(".preco").textContent = brl(p[1]);
     c.querySelector("button").addEventListener("click", function () {
-      var email = document.getElementById("email").value || null;
-      Rastreio.converter(p[1], email).then(function (r) { mostrar(r ? "Compra registrada." : "Compra feita, mas sem rastreio (sem consentimento)."); });
+      // Só o primeiro item da compra marca a etapa: o funil conta pessoas, não cliques.
+      if (!carrinho.length) Rastreio.etapa("carrinho");
+      carrinho.push(p);
+      atualizarCarrinho();
     });
     produtos.appendChild(c);
   });
