@@ -77,7 +77,15 @@ Admin = [Depends(exigir_admin)]
 async def ciclo(_: FastAPI):
     con = conectar(CAMINHO_BANCO)  # cria o esquema uma vez, na subida
     privacidade.aplicar_retencao(con)
+    vazio = con.execute("SELECT COUNT(*) FROM eventos").fetchone()[0] == 0
     con.close()
+    # Hospedagem gratuita (Render free) não tem disco persistente: o banco
+    # some a cada reinício. Com ATRIBUICAO_GERAR_DEMO=1, o servidor recria os
+    # dados fictícios ao subir com o banco vazio, e o painel nunca abre em branco.
+    if vazio and os.environ.get("ATRIBUICAO_GERAR_DEMO") == "1":
+        from scripts.gerar_dados import gerar
+
+        gerar(CAMINHO_BANCO, int(os.environ.get("ATRIBUICAO_PESSOAS_DEMO", "2000")), 42, tempo.agora())
     yield
 
 
@@ -344,6 +352,17 @@ def retencao(
 @app.get("/")
 def pagina_painel():
     return FileResponse(WEB / "index.html")
+
+
+@app.get("/saude")
+def saude():
+    """Verificação de saúde para a hospedagem: o processo responde e o banco abre."""
+    con = conectar(CAMINHO_BANCO, criar=False)
+    try:
+        con.execute("SELECT 1").fetchone()
+    finally:
+        con.close()
+    return {"ok": True}
 
 
 @app.get("/privacidade")

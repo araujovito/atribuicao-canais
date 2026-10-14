@@ -1,0 +1,28 @@
+# Blueprint do Render: Dashboard → New → Blueprint → apontar para o repositório.
+# Plano gratuito: sem disco persistente, então o banco é recriado com dados
+# fictícios a cada reinício (ATRIBUICAO_GERAR_DEMO). Para guardar coleta de
+# verdade, use um plano com disco e aponte ATRIBUICAO_BANCO para ele.
+services:
+  - type: web
+    name: atribuicao-canais
+    runtime: python
+    plan: free
+    buildCommand: pip install uv==0.12.18 && uv sync --locked --no-dev
+    startCommand: uv run --no-dev uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /saude
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.13.3"
+      # Segredos sorteados pelo Render na criação; ficam no painel do serviço.
+      - key: ATRIBUICAO_CHAVE_HMAC
+        generateValue: true
+      - key: ATRIBUICAO_TOKEN_ADMIN
+        generateValue: true
+      # O Render fica na frente do app como proxy: o IP real vem no
+      # X-Forwarded-For (ver app/limite.py).
+      - key: ATRIBUICAO_ATRAS_DE_PROXY
+        value: "1"
+      - key: ATRIBUICAO_GERAR_DEMO
+        value: "1"
+      - key: ATRIBUICAO_BANCO
+        value: /tmp/atribuicao.db

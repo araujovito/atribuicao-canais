@@ -21,7 +21,7 @@ Uso: projeto de portfólio pessoal. Não usa dados reais de ninguém.
 | 3 | Junção de identidade entre aparelhos | mesma pessoa no celular e no computador | feito (`app/acesso.py`) |
 | 4 | Atribuição multicanal | quanto crédito cada canal recebe pela conversão | feito (`app/limite.py`) |
 | 5 | Análise de produto (funis, retenção) | onde as pessoas desistem no caminho | feito (`app/funis.py`) |
-| 6 | Gravação de sessão e mapa de cliques | ver o que a pessoa fez na tela | Hotjar, Microsoft Clarity, FullStory |
+| 6 | Gravação de sessão e mapa de cliques | ver o que a pessoa fez na tela | configuração pronta (`render.yaml`); falta a conta do Vitor |
 | 7 | Coleta e distribuição de eventos (CDP) | coletar uma vez e mandar para vários destinos | CI feito; repositório no GitHub aguarda decisão (público ou privado) |
 | 8 | Automação de marketing | formulários, e-mails, origem e pontuação do lead | feito (`app/incrementalidade.py`) |
 | 9 | CRM | acompanhar o lead até virar cliente/venda | feito (Markov de 2ª ordem) |
@@ -60,7 +60,7 @@ têm partes com licenças que restringem oferecer o produto como serviço a terc
 | Painel comparando modelos | `web/index.html` | feito |
 | Dados fictícios para demonstração | `scripts/gerar_dados.py` | feito |
 | 5 Funis | `app/funis.py`, `/api/etapa` | feito |
-| Publicação online para teste real (celular + computador) | Render/Railway | pendente: conta do Vitor |
+| Publicação online para teste real (celular + computador) | `render.yaml` | configurado; pendente: conta do Vitor |
 
 A ideia é mostrar que entendemos **como** esses serviços funcionam por dentro,
 não reconstruí-los inteiros. Num ambiente real, a coleta poderia ir para o
@@ -128,6 +128,11 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Item 6 (parte local): `render.yaml` (plano gratuito,
+  segredos sorteados pelo Render, proxy ligado), rota `/saude` e
+  `ATRIBUICAO_GERAR_DEMO` para recriar os dados fictícios ao subir com o
+  banco vazio. Build e start simulados num export limpo.
 
 - **2026-10-13** — Item 7 (parte local): GitHub Actions roda `uv sync
   --locked` + pytest + checagem de sintaxe do rastreador. Simulado num

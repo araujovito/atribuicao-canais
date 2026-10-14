@@ -265,3 +265,7 @@ def test_etapa_exige_medicao_e_entra_no_painel(cliente):
     cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "conversao", "valor": 10})
     f = cliente.get("/api/painel", headers=ADMIN).json()["funil"]
     assert f["por_canal"]["Busca paga"] == {"visita": 1, "login": 0, "carrinho": 1, "compra": 1}
+
+
+def test_saude(cliente):
+    assert cliente.get("/saude").json() == {"ok": True}
