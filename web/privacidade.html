@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de privacidade</title>
+<style>
+  :root { --fundo: #faf7f2; --texto: #2b2420; --suave: #6f6259; --borda: #e4dcd2; --acento: #8a4b2a; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fundo: #1c1916; --texto: #eee6dd; --suave: #b0a296; --borda: #3a332d; --acento: #d08a5c; }
+  }
+  body { margin: 0; font: 16px/1.6 system-ui, sans-serif; background: var(--fundo); color: var(--texto); }
+  main { max-width: 720px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.6rem; margin-bottom: 4px; }
+  h2 { font-size: 1.1rem; margin-top: 28px; }
+  a { color: var(--acento); }
+  .aviso { color: var(--suave); font-size: .9rem; }
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--borda); vertical-align: top; }
+  th { color: var(--suave); font-weight: 500; }
+  .tabela { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Política de privacidade</h1>
+  <p class="aviso">Torra Fictícia é uma loja de demonstração de um projeto de portfólio. A empresa, o encarregado e os
+    contatos abaixo são fictícios; o funcionamento descrito é o que o código realmente faz. Versão do texto: v2.</p>
+
+  <h2>Quem trata os dados</h2>
+  <p>Controlador: Torra Fictícia (fictícia). Encarregado (DPO): privacidade@exemplo.invalid (fictício).</p>
+
+  <h2>Para que, com qual base e o que é coletado</h2>
+  <p>A base legal das duas finalidades é o consentimento (LGPD, art. 7º, I), pedido separadamente para cada uma.
+    Sem a sua escolha no banner, nada é coletado.</p>
+  <div class="tabela">
+  <table>
+    <tr><th>Finalidade</th><th>Dados</th><th>O que não é guardado</th></tr>
+    <tr>
+      <td><b>Medição</b>: saber por qual canal você chegou e se comprou.</td>
+      <td>Identificador aleatório do aparelho; parâmetros de campanha (UTM, gclid) da visita de entrada; domínio do
+        site de origem; se o aparelho é celular ou computador; valor das compras; data e hora (UTC).</td>
+      <td>Endereço IP; endereço completo da página de origem; navegador e sistema; páginas visitadas depois da entrada.</td>
+    </tr>
+    <tr>
+      <td><b>Junção entre aparelhos</b>: ligar suas visitas no celular e no computador.</td>
+      <td>Código derivado do seu e-mail por HMAC-SHA256 com chave secreta, ligado aos aparelhos em que você entrou.</td>
+      <td>O e-mail em si.</td>
+    </tr>
+  </table>
+  </div>
+  <p>O IP é usado só em memória, por até uma hora, para limitar abusos (excesso de requisições), e nunca é gravado.</p>
+
+  <h2>Por quanto tempo</h2>
+  <p>13 meses. Depois disso, eventos e ligações são apagados automaticamente. O registro do seu consentimento fica
+    enquanto houver dado coletado com base nele, porque é a prova de que você autorizou.</p>
+
+  <h2>Com quem é compartilhado</h2>
+  <p>Com ninguém. Os dados ficam no servidor do próprio serviço e não são enviados a plataformas de anúncio.</p>
+
+  <h2>Seus direitos e como exercê-los</h2>
+  <ul>
+    <li><b>Retirar o consentimento</b> (art. 8º, §5º): botão "Retirar consentimento" na loja. Retirar só a junção
+      desfaz as ligações deste aparelho com o seu e-mail.</li>
+    <li><b>Eliminar os dados</b> (art. 18, VI): botão "Excluir meus dados" na loja. Enviamos um código ao seu e-mail
+      para confirmar que o pedido é seu; com ele, apagamos tudo que está ligado ao e-mail e os dados anônimos dos
+      aparelhos que só você usou.</li>
+    <li><b>Outros pedidos</b> (acesso, correção, informação): escreva ao encarregado.</li>
+  </ul>
+
+  <p><a href="/loja">Voltar para a loja</a></p>
+</main>
+</body>
+</html>

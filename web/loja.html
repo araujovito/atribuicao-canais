@@ -40,8 +40,11 @@
     padding: 16px; box-shadow: 0 -4px 16px rgba(0,0,0,.08);
   }
   #banner .conteudo { max-width: 860px; margin: 0 auto; display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
-  #banner p { margin: 0; flex: 1 1 320px; font-size: .92rem; }
-  #banner .acoes { display: flex; gap: 8px; }
+  #banner .texto-banner { flex: 1 1 360px; font-size: .9rem; }
+  #banner p { margin: 0 0 8px; }
+  #banner .opcao { display: flex; gap: 8px; align-items: flex-start; margin-top: 6px; }
+  #banner .opcao input { width: auto; margin-top: 4px; }
+  #banner .acoes { display: flex; gap: 8px; flex-wrap: wrap; }
   [hidden] { display: none !important; }
 </style>
 </head>
@@ -72,6 +75,7 @@
 
   <section>
     <h2>Seus dados</h2>
+    <p class="aviso">Veja a <a href="/privacidade">política de privacidade</a>.</p>
     <div class="linha">
       <button class="secundario" id="revogar">Retirar consentimento</button>
       <button class="secundario" id="excluir">Excluir meus dados</button>
@@ -86,12 +90,19 @@
 
 <div id="banner" hidden>
   <div class="conteudo">
-    <p>Usamos um identificador neste aparelho para saber por qual canal você chegou e, se você entrar com
-      seu e-mail, ligar suas visitas no celular e no computador. O e-mail é guardado só como código
-      irreversível sem a nossa chave. Os dados são apagados em 13 meses ou quando você pedir.</p>
+    <div class="texto-banner">
+      <p>Escolha o que podemos fazer com os dados deste aparelho. Nada é coletado sem a sua escolha.
+        Os dados são apagados em 13 meses ou quando você pedir. <a href="/privacidade">Política de privacidade</a>.</p>
+      <label class="opcao"><input type="checkbox" id="opt-medicao">
+        <span><b>Medição</b>: saber por qual canal você chegou (anúncio, busca, e-mail) e se comprou.</span></label>
+      <label class="opcao"><input type="checkbox" id="opt-juncao">
+        <span><b>Junção entre aparelhos</b>: ao entrar com seu e-mail, ligar suas visitas no celular e no
+          computador. O e-mail é guardado só como código, irreversível sem a nossa chave. Exige a medição.</span></label>
+    </div>
     <div class="acoes">
-      <button class="secundario" id="recusar">Recusar</button>
-      <button id="aceitar">Aceitar</button>
+      <button class="secundario" id="recusar">Recusar tudo</button>
+      <button class="secundario" id="salvar">Salvar escolhas</button>
+      <button id="aceitar">Aceitar tudo</button>
     </div>
   </div>
 </div>
@@ -136,11 +147,24 @@
   function mostrar(msg) {
     var e = Rastreio.estado();
     document.getElementById("estado").textContent =
-      (msg ? msg + " · " : "") + "consentimento: " + e.consentimento + (e.anon_id ? " · aparelho: " + e.anon_id : "");
+      (msg ? msg + " · " : "") + "consentimento: " + e.consentimento + (e.juncao ? " (com junção)" : "") +
+      (e.anon_id ? " · aparelho: " + e.anon_id : "");
     document.getElementById("banner").hidden = e.consentimento !== "pendente";
   }
 
-  document.getElementById("aceitar").onclick = function () { Rastreio.aceitar().then(function () { mostrar(); }); };
+  // Caixas começam desmarcadas: consentimento é ato positivo, não omissão.
+  document.getElementById("opt-juncao").onchange = function () {
+    if (this.checked) document.getElementById("opt-medicao").checked = true;
+  };
+  document.getElementById("opt-medicao").onchange = function () {
+    if (!this.checked) document.getElementById("opt-juncao").checked = false;
+  };
+  document.getElementById("aceitar").onclick = function () { Rastreio.aceitar({ juncao: true }).then(function () { mostrar(); }); };
+  document.getElementById("salvar").onclick = function () {
+    var medicao = document.getElementById("opt-medicao").checked;
+    var juncao = document.getElementById("opt-juncao").checked;
+    (medicao ? Rastreio.aceitar({ juncao: juncao }) : Rastreio.recusar()).then(function () { mostrar(); });
+  };
   document.getElementById("recusar").onclick = function () { Rastreio.recusar().then(function () { mostrar(); }); };
   document.getElementById("revogar").onclick = function () { Rastreio.revogar().then(function () { mostrar("Consentimento retirado."); }); };
   document.getElementById("excluir").onclick = function () {
@@ -163,7 +187,7 @@
   document.getElementById("form-login").onsubmit = function (ev) {
     ev.preventDefault();
     Rastreio.identificar(document.getElementById("email").value).then(function (r) {
-      mostrar(r ? "Aparelho ligado ao seu e-mail." : "Sem consentimento: nada foi ligado.");
+      mostrar(r ? "Aparelho ligado ao seu e-mail." : "Sem consentimento para junção: nada foi ligado.");
     });
   };
   mostrar();

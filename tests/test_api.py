@@ -41,8 +41,8 @@ def cliente():
         yield c
 
 
-def aceitar(cliente, anon):
-    cliente.post("/api/consentimento", json={"anon_id": anon, "aceito": True, "versao": "v1"})
+def aceitar(cliente, anon, juncao=True):
+    cliente.post("/api/consentimento", json={"anon_id": anon, "aceito": True, "juncao": juncao, "versao": "v2"})
 
 
 def test_sem_consentimento_nao_grava(cliente):
@@ -217,3 +217,40 @@ def test_cache_percebe_troca_da_ultima_linha(cliente):
     con.close()
     cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "conversao", "valor": 99})
     assert (antes, cliente.get("/api/painel", headers=ADMIN).json()["resumo"]["receita"]) == (10, 99)
+
+
+def test_so_medicao_nao_liga_email_ao_aparelho(cliente):
+    aceitar(cliente, "aparelho-1", juncao=False)
+    r = cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "conversao", "valor": 10,
+                                          "email": "ana@exemplo.com"})
+    assert r.status_code == 200  # a compra é medida...
+    assert consultar("SELECT pessoa_id FROM eventos")[0][0] is None  # ...mas sem pessoa
+    assert consultar("SELECT COUNT(*) FROM vinculos")[0][0] == 0
+    assert cliente.post("/api/identificar", json={"anon_id": "aparelho-1", "email": "ana@exemplo.com"}).status_code == 403
+
+
+def test_juncao_sem_medicao_nao_vale(cliente):
+    cliente.post("/api/consentimento", json={"anon_id": "aparelho-1", "aceito": False, "juncao": True, "versao": "v2"})
+    assert cliente.post("/api/identificar", json={"anon_id": "aparelho-1", "email": "a@exemplo.com"}).status_code == 403
+
+
+def test_retirar_juncao_desfaz_ligacoes_do_aparelho(cliente):
+    aceitar(cliente, "aparelho-1")
+    cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "conversao", "valor": 10, "email": "ana@exemplo.com"})
+    aceitar(cliente, "aparelho-1", juncao=False)
+    assert consultar("SELECT COUNT(*) FROM vinculos")[0][0] == 0
+    assert consultar("SELECT pessoa_id FROM eventos")[0][0] is None
+    # A medição continua valendo.
+    assert cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "visita"}).status_code == 200
+
+
+def test_migra_banco_da_primeira_versao(tmp_path):
+    import sqlite3
+    caminho = tmp_path / "v1.db"
+    antigo = sqlite3.connect(caminho)
+    antigo.execute("CREATE TABLE consentimentos (id INTEGER PRIMARY KEY, anon_id TEXT NOT NULL, versao TEXT NOT NULL,"
+                   " aceito INTEGER NOT NULL, momento TEXT NOT NULL)")
+    antigo.execute("INSERT INTO consentimentos (anon_id, versao, aceito, momento) VALUES ('a', 'v1', 1, 'x')")
+    antigo.commit(); antigo.close()
+    con = conectar(caminho)
+    assert tuple(con.execute("SELECT aceito, juncao FROM consentimentos").fetchone()) == (1, 0)

@@ -91,7 +91,7 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 | 15 | Rastreador só funciona no mesmo domínio (sem CORS) | feito (`ATRIBUICAO_ORIGENS`) |
 | 16 | `gerar_dados.py` apaga o banco sem perguntar | feito (`--substituir`) |
 | 17 | README sem imagem do painel e sem licença | a fazer |
-| 18 | Consentimento único, sem finalidades separadas nem política de privacidade | a fazer |
+| 18 | Consentimento único, sem finalidades separadas nem política de privacidade | feito (medição e junção à parte + `/privacidade`) |
 
 ## Decisões e limites
 
@@ -112,6 +112,12 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Item 18: consentimento por finalidade (medição; junção
+  entre aparelhos), caixas desmarcadas, "Aceitar tudo", "Salvar escolhas" e
+  "Recusar tudo". Sem junção, o e-mail nem sai do navegador e o servidor não
+  liga. Retirar a junção desfaz os vínculos do aparelho. Página
+  `/privacidade` descreve o que o código faz. Migração do banco antigo.
 
 - **2026-10-13** — Item 16: `gerar_dados.py` recusa banco que já tem
   eventos e não altera nada; apagar exige `--substituir`.

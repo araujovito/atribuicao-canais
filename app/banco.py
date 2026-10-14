@@ -45,12 +45,16 @@ CREATE TABLE IF NOT EXISTS vinculos (
 
 -- Registro do consentimento: a LGPD (art. 8º, §2º) põe no controlador o ônus
 -- de provar que o consentimento foi obtido. Guarda-se a versão do texto do
--- banner que a pessoa viu.
+-- banner que a pessoa viu e a resposta por finalidade (art. 8º, §4º:
+-- autorização genérica é nula):
+--   aceito = medição (canal de origem e compras, por aparelho);
+--   juncao = ligar o e-mail ao aparelho para juntar celular e computador.
 CREATE TABLE IF NOT EXISTS consentimentos (
     id      INTEGER PRIMARY KEY,
     anon_id TEXT NOT NULL,
     versao  TEXT NOT NULL,
     aceito  INTEGER NOT NULL,
+    juncao  INTEGER NOT NULL DEFAULT 0,
     momento TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS consentimentos_anon ON consentimentos (anon_id);
@@ -94,4 +98,14 @@ def conectar(caminho: str | Path, criar: bool = True) -> sqlite3.Connection:
         con.execute("PRAGMA journal_mode=WAL")
     if criar:
         con.executescript(ESQUEMA)
+        _migrar(con)
     return con
+
+
+def _migrar(con: sqlite3.Connection) -> None:
+    """Colunas acrescentadas depois da primeira versão, para bancos já criados."""
+    colunas = {r["name"] for r in con.execute("PRAGMA table_info(consentimentos)")}
+    if "juncao" not in colunas:
+        # Consentimento antigo (v1) era uma autorização só; não vale para a
+        # junção, que agora é finalidade separada: entra como 0.
+        con.execute("ALTER TABLE consentimentos ADD COLUMN juncao INTEGER NOT NULL DEFAULT 0")

@@ -149,7 +149,9 @@ def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime, substitui
             vinculos.append((computador, pid, texto(inicio)))
 
         for anon in aparelhos_usados | {ultimo_aparelho}:
-            consent.append((anon, "v1", 1, texto(inicio)))
+            # Medição e junção: aqui todo mundo aceitou as duas, porque o
+            # objetivo é mostrar a junção. A recusa é testada em tests/test_api.py.
+            consent.append((anon, "v2", 1, 1, texto(inicio)))
 
     with con:
         con.executemany(
@@ -159,7 +161,7 @@ def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime, substitui
         )
         con.executemany("INSERT OR IGNORE INTO vinculos VALUES (?, ?, ?)", vinculos)
         con.executemany(
-            "INSERT INTO consentimentos (anon_id, versao, aceito, momento) VALUES (?, ?, ?, ?)", consent
+            "INSERT INTO consentimentos (anon_id, versao, aceito, juncao, momento) VALUES (?, ?, ?, ?, ?)", consent
         )
     stats["eventos"] = len(eventos)
     return stats

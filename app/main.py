@@ -1,7 +1,7 @@
 """API de coleta e de análise.
 
 Rotas:
-    POST   /api/consentimento   registra o sim/não do banner (com versão do texto)
+    POST   /api/consentimento   registra o banner: medição e junção, cada uma à parte
     POST   /api/evento          visita de entrada ou conversão; exige consentimento
     POST   /api/identificar     login/formulário: liga o aparelho ao pseudônimo
     GET    /api/painel          atribuição por modelo, com e sem junção [admin]
@@ -105,11 +105,15 @@ def classe_aparelho(user_agent: str) -> str:
     return "celular" if any(k in ua for k in ("mobi", "android", "iphone")) else "computador"
 
 
-def tem_consentimento(con: sqlite3.Connection, anon_id: str) -> bool:
+def consentimento(con: sqlite3.Connection, anon_id: str) -> tuple[bool, bool]:
+    """(medição, junção) segundo o registro mais recente do aparelho."""
     linha = con.execute(
-        "SELECT aceito FROM consentimentos WHERE anon_id = ? ORDER BY id DESC LIMIT 1", (anon_id,)
+        "SELECT aceito, juncao FROM consentimentos WHERE anon_id = ? ORDER BY id DESC LIMIT 1", (anon_id,)
     ).fetchone()
-    return bool(linha and linha["aceito"])
+    if not linha:
+        return False, False
+    # Junção sem medição não existe: sem a coleta, não há o que juntar.
+    return bool(linha["aceito"]), bool(linha["aceito"] and linha["juncao"])
 
 
 # UUID do navegador (ou o identificador de reserva do rastreio.js): letras,
@@ -119,7 +123,8 @@ ANON_ID = r"^[A-Za-z0-9-]{8,64}$"
 
 class Consentimento(BaseModel):
     anon_id: str = Field(pattern=ANON_ID)
-    aceito: bool
+    aceito: bool  # medição
+    juncao: bool = False  # ligar e-mail ao aparelho; precisa ser marcada à parte
     versao: str = Field(max_length=20)
 
 
@@ -158,22 +163,31 @@ def vincular(con: sqlite3.Connection, anon_id: str, email: str) -> str:
 
 @app.post("/api/consentimento", dependencies=[Depends(limitar("consentimento", 20, 60))])
 def registrar_consentimento(c: Consentimento, con: sqlite3.Connection = Banco):
+    juncao = c.aceito and c.juncao
     with con:
         con.execute(
-            "INSERT INTO consentimentos (anon_id, versao, aceito, momento) VALUES (?, ?, ?, ?)",
-            (c.anon_id, c.versao, int(c.aceito), agora()),
+            "INSERT INTO consentimentos (anon_id, versao, aceito, juncao, momento) VALUES (?, ?, ?, ?, ?)",
+            (c.anon_id, c.versao, int(c.aceito), int(juncao), agora()),
         )
+        if not juncao:
+            # Retirar a junção desfaz as ligações deste aparelho daqui em
+            # diante: o vínculo some e os eventos dele voltam a ser anônimos.
+            con.execute("DELETE FROM vinculos WHERE anon_id = ?", (c.anon_id,))
+            con.execute("UPDATE eventos SET pessoa_id = NULL WHERE anon_id = ? AND pessoa_id IS NOT NULL",
+                        (c.anon_id,))
     return {"ok": True}
 
 
 @app.post("/api/evento", dependencies=[Depends(limitar("evento", 60, 60))])
 def registrar_evento(ev: Evento, request: Request, con: sqlite3.Connection = Banco):
-    if not tem_consentimento(con, ev.anon_id):
+    medicao, juncao = consentimento(con, ev.anon_id)
+    if not medicao:
         raise HTTPException(403, "sem consentimento registrado para este aparelho")
     canal = None
     if ev.tipo == "visita":
         canal = classificar(ev.utm_source, ev.utm_medium, ev.referrer, ev.host, ev.gclid)
-    pessoa_id = vincular(con, ev.anon_id, ev.email) if ev.email else None
+    # O e-mail da compra só liga o aparelho à pessoa com a junção autorizada.
+    pessoa_id = vincular(con, ev.anon_id, ev.email) if ev.email and juncao else None
     with con:
         con.execute(
             """INSERT INTO eventos (anon_id, pessoa_id, tipo, canal, utm_source, utm_medium,
@@ -191,8 +205,8 @@ def registrar_evento(ev: Evento, request: Request, con: sqlite3.Connection = Ban
 
 @app.post("/api/identificar", dependencies=[Depends(limitar("identificar", 20, 60))])
 def identificar(i: Identificacao, con: sqlite3.Connection = Banco):
-    if not tem_consentimento(con, i.anon_id):
-        raise HTTPException(403, "sem consentimento registrado para este aparelho")
+    if not consentimento(con, i.anon_id)[1]:
+        raise HTTPException(403, "sem consentimento para junção entre aparelhos")
     vincular(con, i.anon_id, i.email)
     return {"ok": True}
 
@@ -299,6 +313,11 @@ def retencao(
 @app.get("/")
 def pagina_painel():
     return FileResponse(WEB / "index.html")
+
+
+@app.get("/privacidade")
+def pagina_privacidade():
+    return FileResponse(WEB / "privacidade.html")
 
 
 @app.get("/loja")
