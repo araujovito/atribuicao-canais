@@ -22,7 +22,7 @@ Uso: projeto de portfólio pessoal. Não usa dados reais de ninguém.
 | 4 | Atribuição multicanal | quanto crédito cada canal recebe pela conversão | feito (`app/limite.py`) |
 | 5 | Análise de produto (funis, retenção) | onde as pessoas desistem no caminho | feito (`app/funis.py`) |
 | 6 | Gravação de sessão e mapa de cliques | ver o que a pessoa fez na tela | Hotjar, Microsoft Clarity, FullStory |
-| 7 | Coleta e distribuição de eventos (CDP) | coletar uma vez e mandar para vários destinos | Segment, mParticle |
+| 7 | Coleta e distribuição de eventos (CDP) | coletar uma vez e mandar para vários destinos | CI feito; repositório no GitHub aguarda decisão (público ou privado) |
 | 8 | Automação de marketing | formulários, e-mails, origem e pontuação do lead | feito (`app/incrementalidade.py`) |
 | 9 | CRM | acompanhar o lead até virar cliente/venda | feito (Markov de 2ª ordem) |
 | 10 | Testes A/B e feature flags | testar versões de página | feito (`app/incerteza.py`) |
@@ -128,6 +128,10 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Item 7 (parte local): GitHub Actions roda `uv sync
+  --locked` + pytest + checagem de sintaxe do rastreador. Simulado num
+  clone limpo: 89 testes passam. Falta criar o repositório.
 
 - **2026-10-13** — Item 11: verdade do gerador (Shapley exato sobre a
   regra de compra de cada pessoa) gravada em tabela própria; painel ganhou

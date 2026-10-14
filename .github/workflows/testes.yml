@@ -1,0 +1,29 @@
+# Roda a suíte a cada push e pull request. Versões fixas (Python, uv, lock)
+# para o CI testar exatamente o que roda localmente.
+name: testes
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.12.18"  # a mesma que gerou o uv.lock
+
+      - name: Instalar dependências (exatamente as do uv.lock)
+        run: uv sync --locked --python 3.13
+
+      - name: Testes
+        env:
+          ATRIBUICAO_CHAVE_HMAC: chave-do-ci
+        run: uv run pytest -q
+
+      - name: Sintaxe do JavaScript do navegador
+        run: node --check web/rastreio.js
