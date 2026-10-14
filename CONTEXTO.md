@@ -16,18 +16,18 @@ Uso: projeto de portfólio pessoal. Não usa dados reais de ninguém.
 
 | # | Serviço | O que resolve | Quem vende (exemplos) |
 |---|---|---|---|
-| 1 | Análise de site (web analytics) | visitas, páginas, origem, celular x computador | feito (código por e-mail) |
-| 2 | Rastreamento por UTM | saber qual link/campanha trouxe a visita | feito (token + piso de 30 dias) |
-| 3 | Junção de identidade entre aparelhos | mesma pessoa no celular e no computador | feito (`app/acesso.py`) |
-| 4 | Atribuição multicanal | quanto crédito cada canal recebe pela conversão | feito (`app/limite.py`) |
-| 5 | Análise de produto (funis, retenção) | onde as pessoas desistem no caminho | feito (`app/funis.py`) |
-| 6 | Gravação de sessão e mapa de cliques | ver o que a pessoa fez na tela | configuração pronta (`render.yaml`); falta a conta do Vitor |
-| 7 | Coleta e distribuição de eventos (CDP) | coletar uma vez e mandar para vários destinos | CI feito; repositório no GitHub aguarda decisão (público ou privado) |
-| 8 | Automação de marketing | formulários, e-mails, origem e pontuação do lead | feito (`app/incrementalidade.py`) |
-| 9 | CRM | acompanhar o lead até virar cliente/venda | feito (Markov de 2ª ordem) |
-| 10 | Testes A/B e feature flags | testar versões de página | feito (`app/incerteza.py`) |
-| 11 | Gestão de consentimento (LGPD) | banner de cookies e registro do "sim" | feito (`app/verdade.py`) |
-| 12 | Inteligência de mercado (de fora) | estimar tráfego e ferramentas de outros sites | feito |
+| 1 | Análise de site (web analytics) | visitas, páginas, origem, celular x computador | Google Analytics 4, Adobe Analytics |
+| 2 | Rastreamento por UTM | saber qual link/campanha trouxe a visita | GA4, todas as ferramentas abaixo |
+| 3 | Junção de identidade entre aparelhos | mesma pessoa no celular e no computador | GA4 (User-ID, Google Signals), Mixpanel, Amplitude |
+| 4 | Atribuição multicanal | quanto crédito cada canal recebe pela conversão | GA4, Triple Whale, Northbeam, Hyros |
+| 5 | Análise de produto (funis, retenção) | onde as pessoas desistem no caminho | Mixpanel, Amplitude, Heap |
+| 6 | Gravação de sessão e mapa de cliques | ver o que a pessoa fez na tela | Hotjar, Microsoft Clarity, FullStory |
+| 7 | Coleta e distribuição de eventos (CDP) | coletar uma vez e mandar para vários destinos | Segment, mParticle |
+| 8 | Automação de marketing | formulários, e-mails, origem e pontuação do lead | RD Station, HubSpot, Marketo |
+| 9 | CRM | acompanhar o lead até virar cliente/venda | Salesforce, HubSpot, Pipedrive |
+| 10 | Testes A/B e feature flags | testar versões de página | Optimizely, VWO, LaunchDarkly |
+| 11 | Gestão de consentimento (LGPD) | banner de cookies e registro do "sim" | OneTrust, Cookiebot, Adopt |
+| 12 | Inteligência de mercado (de fora) | estimar tráfego e ferramentas de outros sites | Similarweb, Semrush, Ahrefs, BuiltWith |
 
 ## Repositórios de código aberto por serviço
 
@@ -75,18 +75,18 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Exclusão a pedido sem confirmar identidade: qualquer um apaga dados de qualquer e-mail | a fazer |
-| 2 | `POST /api/retencao?dias=0` aberto apaga o banco inteiro | a fazer |
-| 3 | Painel e API de análise sem autenticação | a fazer |
-| 4 | Sem limite de requisições: dá para encher o banco de eventos falsos | a fazer |
-| 5 | Funis (visita → login → carrinho → compra) por canal | a fazer |
-| 6 | Publicação online (Render/Railway) | a fazer |
-| 7 | Repositório no GitHub + testes no CI | a fazer |
-| 8 | Teste de incrementalidade (grupo de controle) contra os modelos | a fazer |
-| 9 | Markov de 1ª ordem não lembra a origem | a fazer |
-| 10 | Créditos sem margem de erro | a fazer |
-| 11 | Modelos não comparados com a verdade conhecida do gerador | a fazer |
-| 12 | Uma conexão SQLite compartilhada entre requisições | a fazer |
+| 1 | Exclusão a pedido sem confirmar identidade: qualquer um apaga dados de qualquer e-mail | feito (código por e-mail) |
+| 2 | `POST /api/retencao?dias=0` aberto apaga o banco inteiro | feito (token + piso de 30 dias) |
+| 3 | Painel e API de análise sem autenticação | feito (`app/acesso.py`) |
+| 4 | Sem limite de requisições: dá para encher o banco de eventos falsos | feito (`app/limite.py`) |
+| 5 | Funis (visita → login → carrinho → compra) por canal | feito (`app/funis.py`) |
+| 6 | Publicação online (Render/Railway) | configuração pronta (`render.yaml`); falta a conta do Vitor |
+| 7 | Repositório no GitHub + testes no CI | feito (público em github.com/araujovito/atribuicao-canais, CI verde) |
+| 8 | Teste de incrementalidade (grupo de controle) contra os modelos | feito (`app/incrementalidade.py`) |
+| 9 | Markov de 1ª ordem não lembra a origem | feito (Markov de 2ª ordem) |
+| 10 | Créditos sem margem de erro | feito (`app/incerteza.py`) |
+| 11 | Modelos não comparados com a verdade conhecida do gerador | feito (`app/verdade.py`) |
+| 12 | Uma conexão SQLite compartilhada entre requisições | feito |
 | 13 | Painel recalcula tudo a cada acesso | feito (cache por versão dos dados) |
 | 14 | Datas sem fuso horário | feito (`app/tempo.py`) |
 | 15 | Rastreador só funciona no mesmo domínio (sem CORS) | feito (`ATRIBUICAO_ORIGENS`) |
@@ -130,6 +130,11 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Correção do próprio CONTEXTO.md: o status dos itens 1 a 12
+  da lista de melhorias tinha sido escrito, por engano, na tabela de serviços
+  do mercado (também numerada de 1 a 12), sobrescrevendo a coluna "Quem
+  vende". Tabela restaurada do original e status no lugar certo.
 
 - **2026-10-13** — Painel abre nos dados reais quando eles existem; os
   fictícios ficam no seletor. O Vitor abriu o painel e não achou os dados
