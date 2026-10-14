@@ -3,6 +3,7 @@ name = "atribuicao-canais"
 version = "0.1.0"
 description = "De onde vêm os clientes e qual canal merece o crédito: coleta, junção entre aparelhos e atribuição multicanal com LGPD"
 requires-python = ">=3.11"
+license = "MIT"
 dependencies = [
     "fastapi>=0.110",
     "uvicorn>=0.29",

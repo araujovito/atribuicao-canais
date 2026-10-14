@@ -90,7 +90,7 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 | 14 | Datas sem fuso horário | feito (`app/tempo.py`) |
 | 15 | Rastreador só funciona no mesmo domínio (sem CORS) | feito (`ATRIBUICAO_ORIGENS`) |
 | 16 | `gerar_dados.py` apaga o banco sem perguntar | feito (`--substituir`) |
-| 17 | README sem imagem do painel e sem licença | a fazer |
+| 17 | README sem imagem do painel e sem licença | feito (imagens em `docs/`, licença MIT) |
 | 18 | Consentimento único, sem finalidades separadas nem política de privacidade | feito (medição e junção à parte + `/privacidade`) |
 
 ## Decisões e limites
@@ -105,8 +105,9 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
   jornadas cujo conjunto de canais cabe na coalizão), ele se reduz a dividir
   cada conversão igualmente entre os canais distintos da jornada.
 - **Atribuição não é causa.** No dado fictício, Display tem efeito zero na
-  compra e mesmo assim recebe ~8% do crédito no Markov, tanto quanto no
-  primeiro toque, porque abre jornadas. Todo modelo de atribuição mede
+  compra e mesmo assim recebe 4,5% das compras no Markov, perto dos 5,3% do
+  primeiro toque, porque abre jornadas (era ~8% antes do teste de
+  incrementalidade, que tira o Display de metade das pessoas expostas). Todo modelo de atribuição mede
   participação no caminho; efeito causal só com teste de incrementalidade
   (grupo de controle sem o anúncio), que agora está no painel.
 - **Incrementalidade tem pouco poder com amostra pequena.** Com 2.000
@@ -128,6 +129,11 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Item 17: README reescrito (variáveis de ambiente,
+  arquitetura nova, tabela incrementalidade × crédito, comparação com a
+  verdade), imagens do painel e do banner em `docs/`, licença MIT. Números
+  da semente padrão atualizados (431 compras; Display 4,5% no Markov).
 
 - **2026-10-13** — Item 6 (parte local): `render.yaml` (plano gratuito,
   segredos sorteados pelo Render, proxy ligado), rota `/saude` e

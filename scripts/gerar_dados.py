@@ -12,7 +12,7 @@ discordarem, como acontece no mundo real:
 - E-mail aumenta a chance de comprar.
 
 Achado que o Display deixa à mostra: mesmo com efeito zero na compra, ele
-recebe ~8% do crédito no Markov (com a semente padrão), tanto quanto no
+recebe 4,5% das compras no Markov (com a semente padrão), perto dos 5,3% do
 primeiro toque. O efeito de remoção pergunta "o que acontece com as
 jornadas que passam por aqui se o canal some", e no dado as jornadas que
 começam por Display morrem sem ele. Nenhum modelo de atribuição, de regra ou
