@@ -25,7 +25,7 @@ Uso: projeto de portfólio pessoal. Não usa dados reais de ninguém.
 | 7 | Coleta e distribuição de eventos (CDP) | coletar uma vez e mandar para vários destinos | Segment, mParticle |
 | 8 | Automação de marketing | formulários, e-mails, origem e pontuação do lead | RD Station, HubSpot, Marketo |
 | 9 | CRM | acompanhar o lead até virar cliente/venda | feito (Markov de 2ª ordem) |
-| 10 | Testes A/B e feature flags | testar versões de página | Optimizely, VWO, LaunchDarkly |
+| 10 | Testes A/B e feature flags | testar versões de página | feito (`app/incerteza.py`) |
 | 11 | Gestão de consentimento (LGPD) | banner de cookies e registro do "sim" | OneTrust, Cookiebot, Adopt |
 | 12 | Inteligência de mercado (de fora) | estimar tráfego e ferramentas de outros sites | feito |
 
@@ -116,6 +116,11 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Item 10: intervalo de 95% por bootstrap de pessoas
+  (100 réplicas, ~3 s, coberto pelo cache). Leitura dos dados fictícios:
+  último toque tem margens de ±4–5 p.p. nos canais grandes; Markov, ±1,5–2.
+  Os modelos de um toque só jogam fora informação e balançam mais.
 
 - **2026-10-13** — Item 9: Markov de ordem k; o painel mostra 1ª e 2ª.
   Sistema resolvido por Gauss-Seidel (matriz esparsa) em vez de eliminação de

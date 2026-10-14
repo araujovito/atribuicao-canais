@@ -41,10 +41,12 @@ from app.limite import limitar
 from app.atribuicao import NOMES, comparar
 from app.banco import conectar
 from app.canais import CANAIS, classificar
+from app.incerteza import intervalos
 from app.jornadas import JANELA_DIAS, montar
 
 RAIZ = Path(__file__).resolve().parent.parent
 WEB = RAIZ / "web"
+REPLICAS = int(os.environ.get("ATRIBUICAO_REPLICAS", "100"))
 CAMINHO_BANCO = os.environ.get("ATRIBUICAO_BANCO", str(RAIZ / "atribuicao.db"))
 
 
@@ -261,6 +263,10 @@ def calcular_painel(con: sqlite3.Connection, janela_dias: int) -> dict:
         "canais": list(CANAIS),
         "modelos": _serializar(comparar(com.jornadas)),
         "sem_juncao": _serializar(comparar(sem.jornadas)),
+        # Intervalo de 95% da participação de cada canal (bootstrap por
+        # pessoa). É a parte cara do painel (~3 s com os dados fictícios), e
+        # o motivo de o cache existir.
+        "intervalos": intervalos(com.jornadas, REPLICAS),
         "visitas": [dict(v) for v in visitas],
         "resumo": {
             "janela_dias": janela_dias,

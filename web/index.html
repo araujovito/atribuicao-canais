@@ -58,6 +58,7 @@
   th:first-child, td:first-child { text-align: left; }
   td { padding: 8px; text-align: right; font-variant-numeric: tabular-nums; border-radius: 4px; }
   td.cel { cursor: default; }
+  td.cel small { display: block; font-size: .72rem; opacity: .85; }
   .nota-rodape { color: var(--texto-2); font-size: .85rem; margin-top: 10px; }
   #tooltip {
     position: fixed; pointer-events: none; background: var(--superficie); border: 1px solid var(--borda);
@@ -319,7 +320,7 @@
     var medida = el("medida").value;
     var modelos = Object.keys(dados.modelos), canais = canaisPresentes();
     el("sub-matriz").textContent = "Percentual da " + (medida === "receita" ? "receita" : "quantidade de conversões") +
-      " que cada modelo dá a cada canal (com junção). Cor mais forte, mais crédito. Último toque ignora Direto; decaimento usa meia-vida de 7 dias; posição é 40/20/40; Markov usa o efeito de remoção (a 2ª ordem lembra o canal anterior).";
+      " que cada modelo dá a cada canal (com junção), com a margem do intervalo de 95% (bootstrap por pessoa). Cor mais forte, mais crédito. Margens que se sobrepõem: os dados não separam os canais. Último toque ignora Direto; decaimento usa meia-vida de 7 dias; posição é 40/20/40; Markov usa o efeito de remoção (a 2ª ordem lembra o canal anterior).";
     var totais = {}, max = 0;
     modelos.forEach(function (m) {
       var t = 0, v = dados.modelos[m][medida];
@@ -340,13 +341,22 @@
         var passo = Math.min(rampa.length - 1, Math.round((frac / (max || 1)) * (rampa.length - 1)));
         var td = tr.insertCell();
         td.className = "cel";
-        td.textContent = (100 * frac).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%";
+        var iv = dados.intervalos && dados.intervalos[m] && dados.intervalos[m][medida][c];
+        var pct = function (x) { return (100 * x).toLocaleString("pt-BR", { maximumFractionDigits: 1 }); };
+        td.textContent = pct(frac) + "%";
+        if (iv) {
+          // Meia largura do intervalo, para caber na célula; o intervalo inteiro vai no tooltip.
+          var mg = document.createElement("small");
+          mg.textContent = "±" + pct((iv[1] - iv[0]) / 2);
+          td.appendChild(mg);
+        }
         td.style.background = rampa[passo];
         // Texto sobre o preenchimento: branco nos passos escuros, tinta nos claros.
         var corEscura = escuro() ? passo <= 5 : passo >= 6;
         td.style.color = corEscura ? "#ffffff" : "#0b0b0b";
         td.tabIndex = 0;
         var linhas = [{ valor: formatar(v, medida), rotulo: dados.modelos[m].nome }];
+        if (iv) linhas.push({ valor: pct(iv[0]) + "% a " + pct(iv[1]) + "%", rotulo: "intervalo de 95%" });
         td.addEventListener("pointermove", function (ev) { mostrarTip(ev, c, linhas); });
         td.addEventListener("focus", function (ev) { mostrarTip(ev, c, linhas); });
         td.addEventListener("pointerleave", esconderTip);
