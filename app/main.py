@@ -30,6 +30,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -75,6 +76,24 @@ async def ciclo(_: FastAPI):
 
 
 app = FastAPI(title="Atribuição de canais", lifespan=ciclo)
+
+# CORS: o rastreador pode morar no site da loja (loja.com.br) e mandar os
+# eventos para este serviço em outro domínio. Só as origens listadas em
+# ATRIBUICAO_ORIGENS (separadas por vírgula) podem; lista vazia = só o mesmo
+# domínio. "*" não é aceito de propósito: qualquer site poderia injetar
+# eventos em nome dos seus visitantes.
+# allow_headers só tem Content-Type: um site de fora não consegue mandar o
+# cabeçalho Authorization, então as rotas de admin seguem só no mesmo domínio.
+ORIGENS = [o.strip() for o in os.environ.get("ATRIBUICAO_ORIGENS", "").split(",") if o.strip() and o.strip() != "*"]
+if ORIGENS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=ORIGENS,
+        allow_methods=["POST", "DELETE"],
+        allow_headers=["Content-Type"],
+        allow_credentials=False,
+        max_age=600,
+    )
 
 
 def agora() -> str:

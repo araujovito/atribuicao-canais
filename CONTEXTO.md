@@ -88,7 +88,7 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 | 12 | Uma conexão SQLite compartilhada entre requisições | a fazer |
 | 13 | Painel recalcula tudo a cada acesso | feito (cache por versão dos dados) |
 | 14 | Datas sem fuso horário | feito (`app/tempo.py`) |
-| 15 | Rastreador só funciona no mesmo domínio (sem CORS) | a fazer |
+| 15 | Rastreador só funciona no mesmo domínio (sem CORS) | feito (`ATRIBUICAO_ORIGENS`) |
 | 16 | `gerar_dados.py` apaga o banco sem perguntar | a fazer |
 | 17 | README sem imagem do painel e sem licença | a fazer |
 | 18 | Consentimento único, sem finalidades separadas nem política de privacidade | a fazer |
@@ -112,6 +112,11 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Item 15: CORS só para as origens de
+  `ATRIBUICAO_ORIGENS`; "*" é ignorado. Sem o cabeçalho Authorization
+  liberado, as rotas de admin continuam só no mesmo domínio. O rastreador
+  aponta para o serviço com `data-api`.
 
 - **2026-10-13** — Item 13: cache do painel por (janela, versão dos dados).
   Versão = contador mantido por triggers. Descartada a assinatura por
