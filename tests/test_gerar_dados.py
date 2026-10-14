@@ -38,3 +38,22 @@ def test_nao_apaga_banco_com_dados_sem_pedir(tmp_path):
     assert conectar(caminho).execute("SELECT COUNT(*) FROM eventos").fetchone()[0] == antes
     gerar(caminho, 10, 2, HOJE, substituir=True)
     assert conectar(caminho).execute("SELECT COUNT(*) FROM eventos").fetchone()[0] != antes
+
+
+def test_controle_nao_ve_o_canal_do_experimento(tmp_path):
+    caminho = tmp_path / "e.db"
+    gerar(caminho, 800, 3, HOJE)
+    con = conectar(caminho)
+    for canal in ("Display", "Social pago"):
+        grupos = dict(con.execute("SELECT grupo, COUNT(*) FROM experimentos WHERE canal = ? GROUP BY 1", (canal,)).fetchall())
+        assert grupos.get("controle") and grupos.get("tratamento")
+        # Controle que "viu" o canal só pode ser computador compartilhado: outra
+        # pessoa, no tratamento ou fora do teste, viu o anúncio no mesmo
+        # aparelho. É a contaminação que existe em experimento real.
+        vistos = con.execute(
+            """SELECT DISTINCT e.anon_id FROM eventos e
+               JOIN experimentos x ON x.anon_id = e.anon_id AND x.canal = e.canal
+               WHERE x.grupo = 'controle'""").fetchall()
+        for (anon,) in vistos:
+            pessoas = con.execute("SELECT COUNT(*) FROM consentimentos WHERE anon_id = ?", (anon,)).fetchone()[0]
+            assert pessoas > 1, (canal, anon)

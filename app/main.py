@@ -43,6 +43,7 @@ from app.atribuicao import NOMES, comparar
 from app.banco import conectar
 from app.canais import CANAIS, classificar
 from app.funis import funil
+from app.incrementalidade import analisar as incrementalidade
 from app.incerteza import intervalos
 from app.jornadas import JANELA_DIAS, montar
 
@@ -286,6 +287,7 @@ def calcular_painel(con: sqlite3.Connection, janela_dias: int) -> dict:
         "intervalos": intervalos(com.jornadas, REPLICAS),
         "visitas": [dict(v) for v in visitas],
         "funil": funil(con),
+        "incrementalidade": incrementalidade(con),
         "resumo": {
             "janela_dias": janela_dias,
             "aparelhos": com.aparelhos,

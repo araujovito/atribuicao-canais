@@ -23,7 +23,7 @@ Uso: projeto de portfólio pessoal. Não usa dados reais de ninguém.
 | 5 | Análise de produto (funis, retenção) | onde as pessoas desistem no caminho | feito (`app/funis.py`) |
 | 6 | Gravação de sessão e mapa de cliques | ver o que a pessoa fez na tela | Hotjar, Microsoft Clarity, FullStory |
 | 7 | Coleta e distribuição de eventos (CDP) | coletar uma vez e mandar para vários destinos | Segment, mParticle |
-| 8 | Automação de marketing | formulários, e-mails, origem e pontuação do lead | RD Station, HubSpot, Marketo |
+| 8 | Automação de marketing | formulários, e-mails, origem e pontuação do lead | feito (`app/incrementalidade.py`) |
 | 9 | CRM | acompanhar o lead até virar cliente/venda | feito (Markov de 2ª ordem) |
 | 10 | Testes A/B e feature flags | testar versões de página | feito (`app/incerteza.py`) |
 | 11 | Gestão de consentimento (LGPD) | banner de cookies e registro do "sim" | OneTrust, Cookiebot, Adopt |
@@ -108,7 +108,12 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
   compra e mesmo assim recebe ~8% do crédito no Markov, tanto quanto no
   primeiro toque, porque abre jornadas. Todo modelo de atribuição mede
   participação no caminho; efeito causal só com teste de incrementalidade
-  (grupo de controle sem o anúncio).
+  (grupo de controle sem o anúncio), que agora está no painel.
+- **Incrementalidade tem pouco poder com amostra pequena.** Com 2.000
+  pessoas, nenhum dos dois testes distingue o efeito de zero (efeito mínimo
+  detectável de 11 a 12 compras por 100 pessoas). Com 20.000, Social pago dá
+  +5,6 (IC 3,4 a 7,8; o real é +7, diluído) e Display, −0,8 (IC −3,3 a 1,7;
+  o real é 0).
 - **SQLite** no protótipo; em produção, Postgres ou banco analítico + fila de eventos.
 - **Dados de outros sites:** só informação pública (tecnologias usadas, estimativas,
   bibliotecas de anúncios). Dados de visitantes pertencem ao dono do site.
@@ -116,6 +121,15 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Item 8: teste de incrementalidade (ghost ads) para
+  Display e Social pago, 50% controle. Validação contra o efeito verdadeiro
+  do gerador em 10 sementes achou dois vieses para zero: janela de conversão
+  aberta (corrigido: só entra quem foi sorteado há mais de 30 dias) e
+  diluição por aparelho sem login (~20–25%, documentado). Contaminação por
+  computador compartilhado documentada em teste. Os números da semente
+  padrão mudaram (431 compras, 84 entre aparelhos) porque o controle perde
+  os toques do canal.
 
 - **2026-10-13** — Item 5: funil aberto visita → login → carrinho → compra
   por canal de entrada (primeiro toque da pessoa juntada). Etapas em tabela

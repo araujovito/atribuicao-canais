@@ -69,6 +69,18 @@ CREATE TABLE IF NOT EXISTS etapas (
 );
 CREATE INDEX IF NOT EXISTS etapas_anon ON etapas (anon_id);
 
+-- Teste de incrementalidade (ghost ads): quem seria exposto ao anúncio de um
+-- canal é sorteado para tratamento (vê o anúncio) ou controle (não vê, mas o
+-- sorteio fica registrado). Vem da plataforma de anúncios, que é quem sabe
+-- quem seria exposto; aqui, do gerador de dados.
+CREATE TABLE IF NOT EXISTS experimentos (
+    anon_id TEXT NOT NULL,
+    canal   TEXT NOT NULL,
+    grupo   TEXT NOT NULL CHECK (grupo IN ('tratamento', 'controle')),
+    momento TEXT NOT NULL,
+    PRIMARY KEY (anon_id, canal)
+);
+
 -- Versão dos dados: um contador que toda escrita em eventos e vínculos
 -- incrementa. O cache do painel compara este número (ver app/main.py).
 CREATE TABLE IF NOT EXISTS versao (n INTEGER NOT NULL);
@@ -80,6 +92,8 @@ CREATE TRIGGER IF NOT EXISTS versao_vi_i AFTER INSERT ON vinculos BEGIN UPDATE v
 CREATE TRIGGER IF NOT EXISTS versao_vi_d AFTER DELETE ON vinculos BEGIN UPDATE versao SET n = n + 1; END;
 CREATE TRIGGER IF NOT EXISTS versao_et_i AFTER INSERT ON etapas BEGIN UPDATE versao SET n = n + 1; END;
 CREATE TRIGGER IF NOT EXISTS versao_et_d AFTER DELETE ON etapas BEGIN UPDATE versao SET n = n + 1; END;
+CREATE TRIGGER IF NOT EXISTS versao_ex_i AFTER INSERT ON experimentos BEGIN UPDATE versao SET n = n + 1; END;
+CREATE TRIGGER IF NOT EXISTS versao_ex_d AFTER DELETE ON experimentos BEGIN UPDATE versao SET n = n + 1; END;
 
 -- Pedido de exclusão aguardando confirmação pelo código enviado ao e-mail.
 -- Guarda o HMAC do código, nunca o código; expira em 15 minutos e aceita

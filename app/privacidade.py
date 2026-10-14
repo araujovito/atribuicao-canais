@@ -122,6 +122,7 @@ def excluir_titular(con: sqlite3.Connection, email: str, chave_hmac: bytes | Non
         for a in exclusivos:
             n_anon += con.execute("DELETE FROM eventos WHERE anon_id = ? AND pessoa_id IS NULL", (a,)).rowcount
             con.execute("DELETE FROM etapas WHERE anon_id = ?", (a,))
+            con.execute("DELETE FROM experimentos WHERE anon_id = ?", (a,))
             con.execute("DELETE FROM consentimentos WHERE anon_id = ?", (a,))
         n_vinc = con.execute("DELETE FROM vinculos WHERE pessoa_id = ?", (pid,)).rowcount
     return {"eventos_identificados": n_pessoa, "eventos_anonimos": n_anon, "vinculos": n_vinc}
@@ -138,6 +139,7 @@ def aplicar_retencao(con: sqlite3.Connection, dias: int = RETENCAO_DIAS, agora: 
     with con:
         n = con.execute("DELETE FROM eventos WHERE momento < ?", (limite,)).rowcount
         con.execute("DELETE FROM etapas WHERE momento < ?", (limite,))
+        con.execute("DELETE FROM experimentos WHERE momento < ?", (limite,))
         con.execute("DELETE FROM vinculos WHERE momento < ?", (limite,))
         con.execute(
             "DELETE FROM consentimentos WHERE momento < ? AND anon_id NOT IN (SELECT anon_id FROM eventos)",

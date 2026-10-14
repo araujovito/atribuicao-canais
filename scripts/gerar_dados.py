@@ -44,6 +44,12 @@ from app.banco import conectar  # noqa: E402
 from app.privacidade import pseudonimo  # noqa: E402
 from app.tempo import agora, texto  # noqa: E402
 
+# Canais com teste de incrementalidade e a fração sorteada para controle.
+# Metade/metade maximiza o poder do teste para um número fixo de pessoas; em
+# campanha real, o anunciante costuma aceitar perder menos (10% a 30%).
+EXPERIMENTOS = ("Display", "Social pago")
+FRACAO_CONTROLE = 0.5
+
 PRIMEIRO_TOQUE = {
     "Social pago": 0.24, "Busca orgânica": 0.20, "Busca paga": 0.14, "Display": 0.16,
     "Social orgânico": 0.10, "Afiliados": 0.06, "Referência": 0.05, "E-mail": 0.05,
@@ -84,6 +90,7 @@ def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime, substitui
     # Gerador separado para as etapas do funil: sortear login e carrinho no
     # mesmo gerador mudaria todos os números que já estão documentados.
     rng_funil = random.Random(semente + 1)
+    rng_exp = random.Random(semente + 2)
     con = conectar(caminho)
     # O gerador começa apagando tudo. Num banco que já recebeu coleta da loja
     # (ou de um site de verdade), isso perderia dado sem volta.
@@ -92,10 +99,10 @@ def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime, substitui
         con.close()
         raise BancoComDados(f"{caminho} já tem {existentes} eventos; use --substituir para apagar e gerar de novo")
     with con:
-        for tabela in ("eventos", "vinculos", "consentimentos", "etapas"):
+        for tabela in ("eventos", "vinculos", "consentimentos", "etapas", "experimentos"):
             con.execute(f"DELETE FROM {tabela}")
 
-    eventos, vinculos, consent, etapas = [], [], [], []
+    eventos, vinculos, consent, etapas, experimentos = [], [], [], [], []
     pcs_compartilhados: list[str] = []
     stats = {"pessoas": n_pessoas, "compras": 0, "compras_entre_aparelhos": 0}
 
@@ -116,6 +123,17 @@ def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime, substitui
         canais = [sortear(PRIMEIRO_TOQUE, rng)]
         while rng.random() < 0.55 and len(canais) < 7:
             canais.append(sortear(TOQUES_SEGUINTES, rng))
+
+        # Teste de incrementalidade (ghost ads): quem seria exposto ao canal é
+        # sorteado. No controle, os toques daquele canal somem da jornada — a
+        # pessoa não vê o anúncio — e a compra é sorteada com o que sobrou.
+        for canal_exp in EXPERIMENTOS:
+            if canal_exp in canais:
+                grupo = "controle" if rng_exp.random() < FRACAO_CONTROLE else "tratamento"
+                for aparelho in {celular, computador} - {None}:
+                    experimentos.append((aparelho, canal_exp, grupo, texto(inicio)))
+                if grupo == "controle":
+                    canais = [c for c in canais if c != canal_exp]
 
         t = inicio
         aparelhos_usados = set()
@@ -172,6 +190,7 @@ def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime, substitui
         )
         con.executemany("INSERT OR IGNORE INTO vinculos VALUES (?, ?, ?)", vinculos)
         con.executemany("INSERT INTO etapas (anon_id, etapa, momento) VALUES (?, ?, ?)", etapas)
+        con.executemany("INSERT OR IGNORE INTO experimentos VALUES (?, ?, ?, ?)", experimentos)
         con.executemany(
             "INSERT INTO consentimentos (anon_id, versao, aceito, juncao, momento) VALUES (?, ?, ?, ?, ?)", consent
         )

@@ -120,6 +120,15 @@
       <p class="nota-rodape">Atribuição mede participação no caminho, não causa. Nos dados fictícios, Display tem efeito zero na compra e ainda assim recebe crédito em todos os modelos, inclusive no Markov, porque abre jornadas. Efeito causal só se mede com grupo de controle (teste de incrementalidade).</p>
     </div>
 
+    <div class="cartao" id="cartao-inc">
+      <h2>Teste de incrementalidade: crédito contra causa</h2>
+      <p class="sub">Quem seria exposto ao anúncio foi sorteado: tratamento vê, controle não vê (ghost ads). A diferença
+        na taxa de compra é o efeito causal do canal. Só entra quem foi sorteado há mais de 30 dias (janela de
+        conversão fechada). Tudo por 100 pessoas tratadas, para comparar com o crédito que cada modelo dá.</p>
+      <div class="tabela-wrap"><table id="inc"></table></div>
+      <p class="nota-rodape" id="nota-inc"></p>
+    </div>
+
     <div class="cartao">
       <h2>Funil por canal de entrada</h2>
       <p class="sub">Pessoas que chegaram a cada etapa, pelo canal do primeiro toque. Funil aberto: login é opcional,
@@ -248,6 +257,45 @@
     desenharMatriz();
     desenharVisitas();
     desenharFunil();
+    desenharIncrementalidade();
+  }
+
+  function desenharIncrementalidade() {
+    var inc = dados.incrementalidade || {}, canais = Object.keys(inc);
+    el("cartao-inc").hidden = !canais.length;
+    if (!canais.length) return;
+    var num = function (x) { return x.toLocaleString("pt-BR", { maximumFractionDigits: 1 }); };
+    var sinal = function (x) { return (x > 0 ? "+" : x < 0 ? "−" : "") + num(Math.abs(x)); };
+    var tab = el("inc"); tab.replaceChildren();
+    var cab = tab.insertRow();
+    ["Canal", "Pessoas (trat. / contr.)", "Compra no controle", "Compra no tratamento", "Compras causadas",
+     "Crédito: último toque", "Crédito: Markov 1ª", "Crédito: Markov 2ª"].forEach(function (t) {
+      var h = document.createElement("th"); h.textContent = t; cab.appendChild(h);
+    });
+    var notas = [];
+    canais.forEach(function (c) {
+      var r = inc[c], tr = tab.insertRow();
+      tr.insertCell().textContent = c;
+      tr.insertCell().textContent = r.pessoas_tratamento + " / " + r.pessoas_controle;
+      tr.insertCell().textContent = num(100 * r.taxa_controle) + "%";
+      tr.insertCell().textContent = num(100 * r.taxa_tratamento) + "%";
+      var td = tr.insertCell();
+      td.textContent = sinal(100 * r.efeito);
+      var mg = document.createElement("small");
+      mg.textContent = "IC 95%: " + sinal(100 * r.efeito_ic[0]) + " a " + sinal(100 * r.efeito_ic[1]);
+      mg.style.display = "block"; mg.style.color = "var(--texto-2)";
+      td.appendChild(mg);
+      ["ultimo_toque", "markov", "markov2"].forEach(function (m) {
+        var credito = dados.modelos[m].conversoes[c] || 0;
+        tr.insertCell().textContent = num(100 * credito / (r.pessoas_tratamento_total || 1));
+      });
+      notas.push(c + ": " + (r.significativo
+        ? "efeito distinguível de zero."
+        : "não dá para distinguir de zero; com esta amostra, o teste só detecta efeitos acima de " +
+          num(100 * r.efeito_minimo_detectavel) + " compras por 100 pessoas."));
+    });
+    el("nota-inc").textContent = "Valores em compras por 100 pessoas tratadas. " + notas.join(" ") +
+      " O efeito medido tende a ficar abaixo do real: quem não fez login conta como uma pessoa por aparelho.";
   }
 
   var NOMES_ETAPAS = { visita: "Visita", login: "Login", carrinho: "Carrinho", compra: "Compra" };
