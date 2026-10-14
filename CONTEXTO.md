@@ -130,6 +130,11 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 
 Mais recente primeiro.
 
+- **2026-10-13** — Dados reais (3/4): painel escolhe entre dados fictícios e
+  Google Merchandise Store. O banco do GA4 abre só para leitura (a retenção de
+  13 meses apagaria dados de 2020), valores em dólar, junção declarada como
+  inexistente e etapa de login escondida. Primeira carga ~17 s, depois cache.
+
 - **2026-10-13** — Dados reais (2/4): `scripts/importar_ga4.py` traz a
   base pública de GA4 do Google (Google Merchandise Store, nov/2020 a
   jan/2021) para `dados/ga4.db`, fora do git. Amostra determinística de

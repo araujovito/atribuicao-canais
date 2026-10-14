@@ -40,7 +40,7 @@ from app import correio, privacidade, tempo
 from app.acesso import exigir_admin
 from app.limite import limitar
 from app.atribuicao import NOMES, comparar
-from app.banco import conectar
+from app.banco import conectar, conectar_leitura
 from app.canais import CANAIS, classificar
 from app.funis import funil
 from app.incrementalidade import analisar as incrementalidade
@@ -51,6 +51,8 @@ from app.jornadas import JANELA_DIAS, montar
 RAIZ = Path(__file__).resolve().parent.parent
 WEB = RAIZ / "web"
 REPLICAS = int(os.environ.get("ATRIBUICAO_REPLICAS", "100"))
+# Dados reais da base pública de GA4 do Google (scripts/importar_ga4.py).
+CAMINHO_GA4 = os.environ.get("ATRIBUICAO_BANCO_GA4", str(RAIZ / "dados" / "ga4.db"))
 CAMINHO_BANCO = os.environ.get("ATRIBUICAO_BANCO", str(RAIZ / "atribuicao.db"))
 
 
@@ -248,18 +250,46 @@ def _serializar(resultados) -> dict:
 
 
 @app.get("/api/painel", dependencies=Admin)
-def painel(janela_dias: int = Query(JANELA_DIAS, ge=1, le=365), con: sqlite3.Connection = Banco):
-    chave = (janela_dias, versao_dos_dados(con))
-    with _trava_cache:
-        if chave in _cache_painel:
-            _cache_painel.move_to_end(chave)
-            return _cache_painel[chave]
-    resultado = calcular_painel(con, janela_dias)
+def painel(
+    janela_dias: int = Query(JANELA_DIAS, ge=1, le=365),
+    fonte: str = Query("ficticio", pattern="^(ficticio|ga4)$"),
+    con: sqlite3.Connection = Banco,
+):
+    if fonte == "ga4":
+        if not Path(CAMINHO_GA4).exists():
+            raise HTTPException(404, "dados do GA4 não importados; rode scripts/importar_ga4.py")
+        con = conectar_leitura(CAMINHO_GA4)
+    try:
+        # O banco do GA4 é recriado inteiro a cada importação, e o contador de
+        # versão recomeça; a data do arquivo diferencia uma importação da outra.
+        chave = (fonte, janela_dias, versao_dos_dados(con),
+                 os.path.getmtime(CAMINHO_GA4) if fonte == "ga4" else None)
+        with _trava_cache:
+            if chave in _cache_painel:
+                _cache_painel.move_to_end(chave)
+                return _cache_painel[chave]
+        resultado = calcular_painel(con, janela_dias)
+        resultado["fonte"] = FONTES[fonte]
+    finally:
+        if fonte == "ga4":
+            con.close()
     with _trava_cache:
         _cache_painel[chave] = resultado
         while len(_cache_painel) > 8:
             _cache_painel.popitem(last=False)
     return resultado
+
+
+FONTES = {
+    "ficticio": {"id": "ficticio", "nome": "Dados fictícios", "moeda": "BRL"},
+    "ga4": {"id": "ga4", "nome": "Google Merchandise Store (real, nov/2020 a jan/2021)", "moeda": "USD"},
+}
+
+
+@app.get("/api/fontes", dependencies=Admin)
+def fontes():
+    """Fontes de dados disponíveis para o painel (a do GA4 só depois de importada)."""
+    return [FONTES["ficticio"]] + ([FONTES["ga4"]] if Path(CAMINHO_GA4).exists() else [])
 
 
 # Cache do painel. Recalcular monta as jornadas duas vezes (com e sem junção)

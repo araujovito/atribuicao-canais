@@ -115,6 +115,18 @@ CREATE TABLE IF NOT EXISTS pedidos_exclusao (
 """
 
 
+def conectar_leitura(caminho: str | Path) -> sqlite3.Connection:
+    """Abre um banco só para leitura (ex.: dados importados de referência).
+
+    O SQLite recusa qualquer escrita, inclusive a retenção: dados reais
+    públicos de 2020 seriam apagados pelo prazo de 13 meses na primeira
+    subida do servidor.
+    """
+    con = sqlite3.connect(f"file:{Path(caminho).resolve()}?mode=ro", uri=True, timeout=5, check_same_thread=False)
+    con.row_factory = sqlite3.Row
+    return con
+
+
 def conectar(caminho: str | Path, criar: bool = True) -> sqlite3.Connection:
     """Abre o banco. `criar=False` pula o esquema (já criado na subida do servidor).
 

@@ -8,6 +8,7 @@ from pathlib import Path
 os.environ["ATRIBUICAO_BANCO"] = str(Path(tempfile.mkdtemp()) / "teste.db")
 os.environ["ATRIBUICAO_CHAVE_HMAC"] = "chave-de-teste"
 os.environ["ATRIBUICAO_TOKEN_ADMIN"] = "token-de-teste"
+os.environ["ATRIBUICAO_BANCO_GA4"] = str(Path(tempfile.mkdtemp()) / "ga4.db")
 
 import pytest
 from fastapi.testclient import TestClient
@@ -269,3 +270,29 @@ def test_etapa_exige_medicao_e_entra_no_painel(cliente):
 
 def test_saude(cliente):
     assert cliente.get("/saude").json() == {"ok": True}
+
+
+def test_fonte_ga4_somente_leitura(cliente):
+    import csv
+    import io
+
+    from scripts.importar_ga4 import converter, gravar
+    from tests.test_importar_ga4 import CSV
+
+    assert cliente.get("/api/painel?fonte=ga4", headers=ADMIN).status_code == 404
+    assert [f["id"] for f in cliente.get("/api/fontes", headers=ADMIN).json()] == ["ficticio"]
+    eventos, etapas, _ = converter(csv.DictReader(io.StringIO(CSV)))
+    gravar(Path(main.CAMINHO_GA4), eventos, etapas)
+    assert [f["id"] for f in cliente.get("/api/fontes", headers=ADMIN).json()] == ["ficticio", "ga4"]
+    p = cliente.get("/api/painel?fonte=ga4", headers=ADMIN).json()
+    assert p["fonte"]["moeda"] == "USD"
+    assert p["resumo"]["conversoes"] == 2 and p["resumo"]["pessoas_identificadas"] == 0
+    # Dados de 2020: a retenção de 13 meses apagaria tudo, mas o banco é só leitura.
+    cliente.post("/api/retencao?dias=30", headers=ADMIN)
+    assert conectar(main.CAMINHO_GA4).execute("SELECT COUNT(*) FROM eventos").fetchone()[0] == 7
+    assert cliente.get("/api/painel?fonte=outra", headers=ADMIN).status_code == 422
+    import sqlite3
+
+    from app.banco import conectar_leitura
+    with pytest.raises(sqlite3.OperationalError, match="readonly"):
+        conectar_leitura(main.CAMINHO_GA4).execute("DELETE FROM eventos")
