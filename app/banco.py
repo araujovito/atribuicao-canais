@@ -81,6 +81,14 @@ CREATE TABLE IF NOT EXISTS experimentos (
     PRIMARY KEY (anon_id, canal)
 );
 
+-- Verdade conhecida: só existe em dado fictício. O gerador sabe a regra de
+-- compra e grava quantas compras cada canal causa, em média (ver
+-- scripts/gerar_dados.py). Em dado real a tabela fica vazia.
+CREATE TABLE IF NOT EXISTS verdade (
+    canal  TEXT PRIMARY KEY,
+    compras REAL NOT NULL
+);
+
 -- Versão dos dados: um contador que toda escrita em eventos e vínculos
 -- incrementa. O cache do painel compara este número (ver app/main.py).
 CREATE TABLE IF NOT EXISTS versao (n INTEGER NOT NULL);

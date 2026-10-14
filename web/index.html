@@ -117,6 +117,7 @@
       <h2>Participação de cada canal, por modelo</h2>
       <p class="sub" id="sub-matriz"></p>
       <div class="tabela-wrap"><table id="matriz"></table></div>
+      <p class="nota-rodape" id="nota-verdade"></p>
       <p class="nota-rodape">Atribuição mede participação no caminho, não causa. Nos dados fictícios, Display tem efeito zero na compra e ainda assim recebe crédito em todos os modelos, inclusive no Markov, porque abre jornadas. Efeito causal só se mede com grupo de controle (teste de incrementalidade).</p>
     </div>
 
@@ -255,6 +256,7 @@
     desenharTiles(r);
     desenharJuncao();
     desenharMatriz();
+    notaVerdade();
     desenharVisitas();
     desenharFunil();
     desenharIncrementalidade();
@@ -430,6 +432,11 @@
     modelos.forEach(function (m) {
       var h = document.createElement("th"); h.textContent = CURTOS[m] || dados.modelos[m].nome; h.title = dados.modelos[m].nome; cab.appendChild(h);
     });
+    var verdade = dados.verdade;
+    if (verdade) {
+      var hv = document.createElement("th"); hv.textContent = "Verdade";
+      hv.title = "Participação causal de cada canal, conhecida só porque os dados são fictícios"; cab.appendChild(hv);
+    }
     canais.forEach(function (c) {
       var tr = tab.insertRow(), td0 = tr.insertCell(); td0.textContent = c;
       modelos.forEach(function (m) {
@@ -458,7 +465,40 @@
         td.addEventListener("pointerleave", esconderTip);
         td.addEventListener("blur", esconderTip);
       });
+      if (verdade) {
+        // A verdade é em compras causadas (sem valor): a mesma participação nas duas medidas.
+        var fv = verdade.participacao[c] || 0;
+        var tv = tr.insertCell();
+        tv.textContent = (100 * fv).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%";
+        tv.style.fontWeight = "600";
+        tv.style.borderLeft = "2px solid var(--eixo)";
+      }
     });
+    if (verdade) {
+      var rodape = tab.insertRow(), r0 = rodape.insertCell();
+      r0.textContent = "Crédito no canal errado (em conversões)";
+      r0.title = "Metade da soma das diferenças de participação contra a verdade";
+      modelos.forEach(function (m) {
+        var t = rodape.insertCell();
+        t.textContent = (100 * verdade.credito_no_canal_errado[m]).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%";
+        t.style.fontWeight = "600";
+      });
+      rodape.insertCell();
+    }
+  }
+
+  function notaVerdade() {
+    var v = dados.verdade, n = el("nota-verdade");
+    n.hidden = !v;
+    if (!v) return;
+    var ordem = Object.keys(v.credito_no_canal_errado).sort(function (a, b) {
+      return v.credito_no_canal_errado[a] - v.credito_no_canal_errado[b];
+    });
+    n.textContent = "Coluna Verdade: o gerador de dados conhece a regra de compra e calcula quanto cada canal causa " +
+      "(valor de Shapley sobre a chance de compra de cada pessoa). Mais perto da verdade aqui: " +
+      dados.modelos[ordem[0]].nome + "; mais longe: " + dados.modelos[ordem[ordem.length - 1]].nome +
+      ". Isso vale para a regra deste gerador, em que os canais que mais causam compra aparecem perto do fim da " +
+      "jornada; com outra regra, a ordem muda. Em dado real não existe esta coluna.";
   }
 
   function desenharVisitas() {

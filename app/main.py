@@ -45,6 +45,7 @@ from app.canais import CANAIS, classificar
 from app.funis import funil
 from app.incrementalidade import analisar as incrementalidade
 from app.incerteza import intervalos
+from app.verdade import comparar_com_verdade
 from app.jornadas import JANELA_DIAS, montar
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -277,9 +278,13 @@ def calcular_painel(con: sqlite3.Connection, janela_dias: int) -> dict:
         "SELECT canal, aparelho, COUNT(*) n FROM eventos WHERE tipo = 'visita' AND canal IS NOT NULL GROUP BY 1, 2"
     ).fetchall()
     convertidas = [j for j in com.jornadas if j.converteu]
+    resultados = comparar(com.jornadas)
     return {
         "canais": list(CANAIS),
-        "modelos": _serializar(comparar(com.jornadas)),
+        "modelos": _serializar(resultados),
+        # Só em dado fictício: participação verdadeira de cada canal e quanto
+        # do crédito de cada modelo está no canal errado. None em dado real.
+        "verdade": comparar_com_verdade(con, resultados),
         "sem_juncao": _serializar(comparar(sem.jornadas)),
         # Intervalo de 95% da participação de cada canal (bootstrap por
         # pessoa). É a parte cara do painel (~3 s com os dados fictícios), e

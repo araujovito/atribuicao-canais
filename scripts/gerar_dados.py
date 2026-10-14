@@ -32,9 +32,12 @@ Uso:
 from __future__ import annotations
 
 import argparse
+import itertools
 import random
 import sys
 import uuid
+from collections import defaultdict
+from math import factorial
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -81,6 +84,35 @@ def chance_de_compra(canais: list[str]) -> float:
     return min(p, 0.75)
 
 
+def contribuicoes(canais: list[str]) -> dict[str, float]:
+    """Quanto cada canal soma à chance de compra desta pessoa (valor de Shapley).
+
+    A função de valor é a própria regra causal: v(S) = chance de compra com só
+    os toques dos canais em S, menos a chance sem toque nenhum. O Shapley
+    divide v(todos) entre os canais pela média das contribuições marginais em
+    todas as ordens de entrada — o que resolve os casos em que a regra não é
+    aditiva (teto de 5 toques). Com no máximo 7 canais distintos, são até 128
+    subconjuntos por pessoa; dá para calcular exato.
+    """
+    distintos = sorted(set(canais))
+    n = len(distintos)
+    v = {}
+    for k in range(n + 1):
+        for S in itertools.combinations(distintos, k):
+            v[S] = chance_de_compra([c for c in canais if c in S]) - chance_de_compra([])
+    phi = {}
+    for c in distintos:
+        outros = [x for x in distintos if x != c]
+        total = 0.0
+        for k in range(n):
+            peso = factorial(k) * factorial(n - k - 1) / factorial(n)
+            for S in itertools.combinations(outros, k):
+                com = tuple(sorted((*S, c)))
+                total += peso * (v[com] - v[S])
+        phi[c] = total
+    return phi
+
+
 class BancoComDados(Exception):
     pass
 
@@ -99,10 +131,11 @@ def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime, substitui
         con.close()
         raise BancoComDados(f"{caminho} já tem {existentes} eventos; use --substituir para apagar e gerar de novo")
     with con:
-        for tabela in ("eventos", "vinculos", "consentimentos", "etapas", "experimentos"):
+        for tabela in ("eventos", "vinculos", "consentimentos", "etapas", "experimentos", "verdade"):
             con.execute(f"DELETE FROM {tabela}")
 
     eventos, vinculos, consent, etapas, experimentos = [], [], [], [], []
+    verdade: dict[str, float] = defaultdict(float)
     pcs_compartilhados: list[str] = []
     stats = {"pessoas": n_pessoas, "compras": 0, "compras_entre_aparelhos": 0}
 
@@ -152,6 +185,11 @@ def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime, substitui
                             "celular" if anon == celular else "computador", 0.0, texto(t)))
             t += timedelta(days=rng.expovariate(1 / 2.5), hours=rng.uniform(0, 5))
 
+        # Verdade: compras que cada canal causa, em esperança, nesta jornada (a
+        # que a pessoa viu de fato, já sem os toques removidos no controle).
+        for c, phi in contribuicoes(canais).items():
+            verdade[c] += phi
+
         ultimo_aparelho = computador if perfil == "dois" else (celular or computador)
         if rng.random() < chance_de_compra(canais) and t <= hoje:
             valor = round(min(rng.lognormvariate(4.3, 0.6), 900), 2)
@@ -191,6 +229,7 @@ def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime, substitui
         con.executemany("INSERT OR IGNORE INTO vinculos VALUES (?, ?, ?)", vinculos)
         con.executemany("INSERT INTO etapas (anon_id, etapa, momento) VALUES (?, ?, ?)", etapas)
         con.executemany("INSERT OR IGNORE INTO experimentos VALUES (?, ?, ?, ?)", experimentos)
+        con.executemany("INSERT INTO verdade VALUES (?, ?)", sorted(verdade.items()))
         con.executemany(
             "INSERT INTO consentimentos (anon_id, versao, aceito, juncao, momento) VALUES (?, ?, ?, ?, ?)", consent
         )

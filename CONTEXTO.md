@@ -26,7 +26,7 @@ Uso: projeto de portfólio pessoal. Não usa dados reais de ninguém.
 | 8 | Automação de marketing | formulários, e-mails, origem e pontuação do lead | feito (`app/incrementalidade.py`) |
 | 9 | CRM | acompanhar o lead até virar cliente/venda | feito (Markov de 2ª ordem) |
 | 10 | Testes A/B e feature flags | testar versões de página | feito (`app/incerteza.py`) |
-| 11 | Gestão de consentimento (LGPD) | banner de cookies e registro do "sim" | OneTrust, Cookiebot, Adopt |
+| 11 | Gestão de consentimento (LGPD) | banner de cookies e registro do "sim" | feito (`app/verdade.py`) |
 | 12 | Inteligência de mercado (de fora) | estimar tráfego e ferramentas de outros sites | feito |
 
 ## Repositórios de código aberto por serviço
@@ -114,6 +114,13 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
   detectável de 11 a 12 compras por 100 pessoas). Com 20.000, Social pago dá
   +5,6 (IC 3,4 a 7,8; o real é +7, diluído) e Display, −0,8 (IC −3,3 a 1,7;
   o real é 0).
+- **Mais perto da verdade, aqui, é o último toque.** Com a verdade do
+  gerador (Shapley sobre a chance de compra), 8% do crédito do último toque
+  está no canal errado, contra ~17% no Markov e 22% no primeiro toque. É
+  propriedade da regra do gerador (E-mail e Busca paga, que mais causam
+  compra, aparecem perto do fim), não prova de que o último toque seja melhor
+  em geral. O ponto é ter uma régua: em dado real, ela vem do teste de
+  incrementalidade.
 - **SQLite** no protótipo; em produção, Postgres ou banco analítico + fila de eventos.
 - **Dados de outros sites:** só informação pública (tecnologias usadas, estimativas,
   bibliotecas de anúncios). Dados de visitantes pertencem ao dono do site.
@@ -121,6 +128,11 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
 ## Histórico
 
 Mais recente primeiro.
+
+- **2026-10-13** — Item 11: verdade do gerador (Shapley exato sobre a
+  regra de compra de cada pessoa) gravada em tabela própria; painel ganhou
+  a coluna Verdade e a linha "crédito no canal errado". Último toque 8%,
+  Markov ~17%, primeiro toque 22%.
 
 - **2026-10-13** — Item 8: teste de incrementalidade (ghost ads) para
   Display e Social pago, 50% controle. Validação contra o efeito verdadeiro
