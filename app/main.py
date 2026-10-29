@@ -28,20 +28,20 @@ from collections import OrderedDict
 from collections.abc import Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from urllib.parse import urlparse
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.middleware.body_limit import RequestBodyLimitMiddleware
 
 from app import correio, privacidade, tempo
 from app.acesso import exigir_admin
 from app.limite import limitar
 from app.atribuicao import NOMES, comparar
 from app.banco import conectar, conectar_leitura
-from app.canais import CANAIS, classificar
+from app.canais import CANAIS, classificar, host_da_url
 from app.funis import funil
 from app.incrementalidade import analisar as incrementalidade
 from app.incerteza import intervalos
@@ -52,8 +52,18 @@ RAIZ = Path(__file__).resolve().parent.parent
 WEB = RAIZ / "web"
 REPLICAS = int(os.environ.get("ATRIBUICAO_REPLICAS", "100"))
 # Dados reais da base pública de GA4 do Google (scripts/importar_ga4.py).
-CAMINHO_GA4 = os.environ.get("ATRIBUICAO_BANCO_GA4", str(RAIZ / "dados" / "ga4.db"))
-CAMINHO_BANCO = os.environ.get("ATRIBUICAO_BANCO", str(RAIZ / "atribuicao.db"))
+CAMINHO_BANCO = os.environ.get("DATABASE_URL", os.environ.get("ATRIBUICAO_BANCO", "postgresql://atribuicao:atribuicao@localhost:5432/atribuicao"))
+CAMINHO_GA4 = os.environ.get("ATRIBUICAO_BANCO_GA4", CAMINHO_BANCO if CAMINHO_BANCO.startswith(("postgresql://", "postgres://")) else str(RAIZ / "dados" / "ga4.db"))
+
+
+def ga4_disponivel() -> bool:
+    if CAMINHO_GA4.startswith(("postgresql://", "postgres://")):
+        con = conectar(CAMINHO_GA4, criar=False)
+        try:
+            return con.execute("SELECT to_regclass('ga4.eventos') IS NOT NULL").fetchone()[0]
+        finally:
+            con.close()
+    return Path(CAMINHO_GA4).exists()
 
 
 def banco() -> Iterator[sqlite3.Connection]:
@@ -92,6 +102,9 @@ async def ciclo(_: FastAPI):
 
 
 app = FastAPI(title="Atribuição de canais", lifespan=ciclo)
+# A maior carga legítima desta API é um pequeno evento JSON. O limite também
+# vale para corpos enviados em partes, não apenas para Content-Length.
+app.add_middleware(RequestBodyLimitMiddleware, max_body_size=32 * 1024)
 
 # CORS: o rastreador pode morar no site da loja (loja.com.br) e mandar os
 # eventos para este serviço em outro domínio. Só as origens listadas em
@@ -146,13 +159,14 @@ class Consentimento(BaseModel):
 
 class Evento(BaseModel):
     anon_id: str = Field(pattern=ANON_ID)
+    id_evento: str | None = Field(default=None, pattern=ANON_ID)
     tipo: str = Field(pattern="^(visita|conversao)$")
-    host: str | None = None
-    referrer: str | None = None
-    utm_source: str | None = None
-    utm_medium: str | None = None
-    utm_campaign: str | None = None
-    gclid: str | None = None
+    host: str | None = Field(default=None, max_length=253)
+    referrer: str | None = Field(default=None, max_length=2048)
+    utm_source: str | None = Field(default=None, max_length=200)
+    utm_medium: str | None = Field(default=None, max_length=100)
+    utm_campaign: str | None = Field(default=None, max_length=500)
+    gclid: str | None = Field(default=None, max_length=500)
     valor: float = Field(default=0, ge=0, le=1_000_000)
     email: str | None = Field(default=None, max_length=254)
 
@@ -204,6 +218,8 @@ def registrar_evento(ev: Evento, request: Request, con: sqlite3.Connection = Ban
     medicao, juncao = consentimento(con, ev.anon_id)
     if not medicao:
         raise HTTPException(403, "sem consentimento registrado para este aparelho")
+    if ev.id_evento and ev.tipo != "visita":
+        raise HTTPException(422, "id_evento é permitido apenas para visitas")
     canal = None
     if ev.tipo == "visita":
         canal = classificar(ev.utm_source, ev.utm_medium, ev.referrer, ev.host, ev.gclid)
@@ -211,16 +227,20 @@ def registrar_evento(ev: Evento, request: Request, con: sqlite3.Connection = Ban
     pessoa_id = vincular(con, ev.anon_id, ev.email) if ev.email and juncao else None
     with con:
         con.execute(
-            """INSERT INTO eventos (anon_id, pessoa_id, tipo, canal, utm_source, utm_medium,
+            """INSERT INTO eventos (anon_id, id_evento, pessoa_id, tipo, canal, utm_source, utm_medium,
                    utm_campaign, referrer_host, aparelho, valor, momento)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(anon_id, id_evento) DO NOTHING""",
             (
-                ev.anon_id, pessoa_id, ev.tipo, canal, ev.utm_source, ev.utm_medium, ev.utm_campaign,
-                urlparse(ev.referrer).hostname if ev.referrer else None,
+                ev.anon_id, ev.id_evento, pessoa_id, ev.tipo, canal, ev.utm_source, ev.utm_medium, ev.utm_campaign,
+                host_da_url(ev.referrer) or None,
                 classe_aparelho(request.headers.get("user-agent", "")),
                 ev.valor if ev.tipo == "conversao" else 0, agora(),
             ),
         )
+        if ev.id_evento:
+            canal = con.execute("SELECT canal FROM eventos WHERE anon_id = ? AND id_evento = ?",
+                                (ev.anon_id, ev.id_evento)).fetchone()[0]
     return {"ok": True, "canal": canal}
 
 
@@ -256,14 +276,16 @@ def painel(
     con: sqlite3.Connection = Banco,
 ):
     if fonte == "ga4":
-        if not Path(CAMINHO_GA4).exists():
+        if not ga4_disponivel():
             raise HTTPException(404, "dados do GA4 não importados; rode scripts/importar_ga4.py")
         con = conectar_leitura(CAMINHO_GA4)
     try:
         # O banco do GA4 é recriado inteiro a cada importação, e o contador de
         # versão recomeça; a data do arquivo diferencia uma importação da outra.
-        chave = (fonte, janela_dias, versao_dos_dados(con),
-                 os.path.getmtime(CAMINHO_GA4) if fonte == "ga4" else None)
+        # A elegibilidade dos experimentos muda com o relógio mesmo sem escrita.
+        # O minuto limita a defasagem a menos de 60 s sem eliminar o cache.
+        chave = (fonte, janela_dias, versao_dos_dados(con), tempo.agora().replace(second=0),
+                 os.path.getmtime(CAMINHO_GA4) if fonte == "ga4" and not CAMINHO_GA4.startswith(("postgresql://", "postgres://")) else None)
         with _trava_cache:
             if chave in _cache_painel:
                 _cache_painel.move_to_end(chave)
@@ -289,7 +311,7 @@ FONTES = {
 @app.get("/api/fontes", dependencies=Admin)
 def fontes():
     """Fontes de dados disponíveis para o painel (a do GA4 só depois de importada)."""
-    return [FONTES["ficticio"]] + ([FONTES["ga4"]] if Path(CAMINHO_GA4).exists() else [])
+    return [FONTES["ficticio"]] + ([FONTES["ga4"]] if ga4_disponivel() else [])
 
 
 # Cache do painel. Recalcular monta as jornadas duas vezes (com e sem junção)
@@ -381,6 +403,12 @@ def retencao(
 
 @app.get("/")
 def pagina_painel():
+    return FileResponse(WEB / "index.html")
+
+
+@app.get("/demo")
+def pagina_demo():
+    """Painel público de amostra estática; nunca consulta os dados de visitantes."""
     return FileResponse(WEB / "index.html")
 
 

@@ -79,6 +79,7 @@
   <h1>Atribuição de canais</h1>
   <p class="sub"><span id="nome-fonte">Dados fictícios</span>. Quanto cada canal recebe de crédito pelas vendas, por modelo, e o que muda ao juntar celular e computador da mesma pessoa.
     <a href="/loja">Abrir a loja de demonstração</a>.</p>
+  <p class="sub" id="aviso-demo" hidden>Esta demonstração usa uma amostra fictícia fixa, independente dos dados da loja. Janela: 30 dias.</p>
 
   <form class="filtros" id="form-token" hidden>
     <label>Token de administrador
@@ -160,6 +161,7 @@
     decaimento_temporal: "Decaimento", posicao: "Posição", markov: "Markov 1ª", markov2: "Markov 2ª",
   };
   var dados = null;
+  var demoPublica = location.pathname === "/demo";
   var el = function (id) { return document.getElementById(id); };
   var SVGNS = "http://www.w3.org/2000/svg";
 
@@ -222,6 +224,7 @@
   // Lista de fontes: a do GA4 só aparece depois de importada no servidor.
   var fontesCarregadas = false;
   function carregarFontes() {
+    if (demoPublica) return;
     if (fontesCarregadas) return;
     fontesCarregadas = true;
     fetch("/api/fontes", { headers: { Authorization: "Bearer " + lerToken() } })
@@ -245,7 +248,7 @@
 
   function carregar() {
     el("conteudo").classList.add("carregando");
-    fetch("/api/painel?janela_dias=" + el("janela").value + "&fonte=" + el("fonte").value,
+    fetch(demoPublica ? "/web/demo.json" : "/api/painel?janela_dias=" + el("janela").value + "&fonte=" + el("fonte").value,
           { headers: { Authorization: "Bearer " + lerToken() } })
       .then(function (r) {
         if (r.status === 401) { pedirToken(lerToken() ? "Token inválido." : ""); return null; }
@@ -310,6 +313,12 @@
       var r = inc[c], tr = tab.insertRow();
       tr.insertCell().textContent = c;
       tr.insertCell().textContent = r.pessoas_tratamento + " / " + r.pessoas_controle;
+      if (!r.disponivel) {
+        var indisponivel = tr.insertCell(); indisponivel.colSpan = 6;
+        indisponivel.textContent = "Dados insuficientes em um dos grupos.";
+        notas.push(c + ": " + r.pessoas_contaminadas + " pessoa(s) excluída(s) por grupos conflitantes.");
+        return;
+      }
       tr.insertCell().textContent = num(100 * r.taxa_controle) + "%";
       tr.insertCell().textContent = num(100 * r.taxa_tratamento) + "%";
       var td = tr.insertCell();
@@ -322,9 +331,9 @@
         var credito = dados.modelos[m].conversoes[c] || 0;
         tr.insertCell().textContent = num(100 * credito / (r.pessoas_tratamento_total || 1));
       });
-      notas.push(c + ": " + (r.significativo
+      notas.push(c + ": " + r.pessoas_contaminadas + " pessoa(s) excluída(s) por grupos conflitantes; " + (r.significativo
         ? "efeito distinguível de zero."
-        : "não dá para distinguir de zero; com esta amostra, o teste só detecta efeitos acima de " +
+        : "não dá para distinguir de zero; efeito mínimo detectável aproximado: " +
           num(100 * r.efeito_minimo_detectavel) + " compras por 100 pessoas."));
     });
     el("nota-inc").textContent = "Valores em compras por 100 pessoas tratadas. " + notas.join(" ") +
@@ -560,6 +569,11 @@
   ["medida", "modelo"].forEach(function (id) { el(id).addEventListener("change", function () { if (dados) desenhar(); }); });
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () { if (dados) desenhar(); });
   var redim; addEventListener("resize", function () { clearTimeout(redim); redim = setTimeout(function () { if (dados) { desenharJuncao(); desenharFunil(); } }, 150); });
+  if (demoPublica) {
+    el("aviso-demo").hidden = false;
+    el("janela").disabled = true;
+    el("fonte").disabled = true;
+  }
   carregar();
 })();
 </script>

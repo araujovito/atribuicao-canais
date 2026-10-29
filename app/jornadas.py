@@ -22,6 +22,7 @@ painel o que a atribuição diria sem a junção entre aparelhos.
 from __future__ import annotations
 
 import sqlite3
+from bisect import bisect_left
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -66,7 +67,10 @@ def montar(con: sqlite3.Connection, janela_dias: int = JANELA_DIAS, juntar: bool
                 if ev["canal"]:
                     toques.append((ev["canal"], t, ev["anon_id"]))
                 continue
-            na_janela = [p for p in toques if t - p[1] <= janela]
+            # Os toques estão ordenados. Evita percorrer todo o histórico da
+            # pessoa a cada recompra para descartar toques antigos.
+            inicio_janela = bisect_left(toques, t - janela, key=lambda p: p[1])
+            na_janela = toques[inicio_janela:]
             if not na_janela:
                 na_janela = [(DIRETO, t, ev["anon_id"])]
             jornadas.append(Jornada(

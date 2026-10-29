@@ -123,7 +123,7 @@ em par, quando dois mexem no mesmo código), e o status é atualizado junto.
   compra, aparecem perto do fim), não prova de que o último toque seja melhor
   em geral. O ponto é ter uma régua: em dado real, ela vem do teste de
   incrementalidade.
-- **SQLite** no protótipo; em produção, Postgres ou banco analítico + fila de eventos.
+- **PostgreSQL** como banco principal; os antigos arquivos SQLite podem ser copiados com o migrador.
 - **Dados de outros sites:** só informação pública (tecnologias usadas, estimativas,
   bibliotecas de anúncios). Dados de visitantes pertencem ao dono do site.
 

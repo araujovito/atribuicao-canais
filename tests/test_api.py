@@ -5,13 +5,14 @@ from pathlib import Path
 
 # Arquivo, não :memory: — cada requisição abre a própria conexão, e cada
 # conexão a ":memory:" seria um banco vazio diferente.
+os.environ.pop("DATABASE_URL", None)  # Nunca apontar a suíte ao banco real do ambiente.
 os.environ["ATRIBUICAO_BANCO"] = str(Path(tempfile.mkdtemp()) / "teste.db")
 os.environ["ATRIBUICAO_CHAVE_HMAC"] = "chave-de-teste"
 os.environ["ATRIBUICAO_TOKEN_ADMIN"] = "token-de-teste"
 os.environ["ATRIBUICAO_BANCO_GA4"] = str(Path(tempfile.mkdtemp()) / "ga4.db")
 
 import pytest
-from fastapi.testclient import TestClient
+from starlette.testclient import TestClient
 
 from app import limite, main
 from app.banco import conectar
@@ -150,6 +151,18 @@ def test_painel_exige_token(cliente):
     assert cliente.get("/api/painel", headers=ADMIN).status_code == 200
 
 
+def test_demo_publica_e_estatica_sem_expor_painel_privado(cliente):
+    aceitar(cliente, "aparelho-1")
+    cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "conversao", "valor": 999})
+    assert cliente.get("/demo").status_code == 200
+    demo = cliente.get("/web/demo.json")
+    assert demo.status_code == 200
+    assert demo.json()["resumo"]["conversoes"] == 431
+    assert "aparelho-1" not in demo.text
+    assert cliente.get("/api/painel").status_code == 401
+    assert cliente.post("/api/retencao").status_code == 401
+
+
 def test_retencao_exige_token_e_nao_esvazia_o_banco(cliente):
     aceitar(cliente, "aparelho-1")
     cliente.post("/api/evento", json={"anon_id": "aparelho-1", "tipo": "visita"})
@@ -179,6 +192,41 @@ def test_anon_id_com_caracteres_estranhos(cliente):
     assert r.status_code == 422
 
 
+def test_campos_de_marketing_tem_limite(cliente):
+    aceitar(cliente, "aparelho-1")
+    r = cliente.post("/api/evento", json={
+        "anon_id": "aparelho-1", "tipo": "visita", "utm_source": "x" * 201,
+    })
+    assert r.status_code == 422
+    assert consultar("SELECT COUNT(*) FROM eventos")[0][0] == 0
+
+
+def test_corpo_da_requisicao_tem_limite(cliente):
+    aceitar(cliente, "aparelho-1")
+    r = cliente.post("/api/evento", content=b"x" * (32 * 1024 + 1), headers={"content-type": "application/json"})
+    assert r.status_code == 413
+
+
+def test_referrer_invalido_nao_derruba_api(cliente):
+    aceitar(cliente, "aparelho-1")
+    r = cliente.post("/api/evento", json={
+        "anon_id": "aparelho-1", "tipo": "visita", "referrer": "http://[x",
+    })
+    assert r.status_code == 200
+    assert r.json()["canal"] == "Direto"
+    assert consultar("SELECT referrer_host FROM eventos")[0][0] is None
+
+
+def test_visita_repetida_com_mesmo_id_e_idempotente(cliente):
+    aceitar(cliente, "aparelho-1")
+    evento = {"anon_id": "aparelho-1", "id_evento": "visita-123", "tipo": "visita",
+              "utm_source": "google", "utm_medium": "cpc"}
+    respostas = [cliente.post("/api/evento", json=evento) for _ in range(2)]
+    assert [r.status_code for r in respostas] == [200, 200]
+    assert all(r.json()["canal"] == "Busca paga" for r in respostas)
+    assert consultar("SELECT COUNT(*) FROM eventos")[0][0] == 1
+
+
 def test_atras_de_proxy_vale_o_ip_que_o_proxy_acrescentou(cliente, monkeypatch):
     monkeypatch.setattr(limite, "ATRAS_DE_PROXY", True)
     aceitar(cliente, "aparelho-1")
@@ -205,6 +253,21 @@ def test_painel_usa_cache_ate_os_dados_mudarem(cliente, monkeypatch):
     assert len(chamadas) == 2 and p["resumo"]["conversoes"] == 2
     cliente.get("/api/painel?janela_dias=7", headers=ADMIN)
     assert len(chamadas) == 3
+
+
+def test_cache_do_painel_expira_com_o_tempo(cliente, monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    instante = datetime(2026, 10, 13, tzinfo=timezone.utc)
+    monkeypatch.setattr(main.tempo, "agora", lambda: instante)
+    chamadas = []
+    monkeypatch.setattr(main, "calcular_painel", lambda con, janela: chamadas.append(janela) or {})
+    cliente.get("/api/painel", headers=ADMIN)
+    cliente.get("/api/painel", headers=ADMIN)
+    assert len(chamadas) == 1
+    instante += timedelta(minutes=1)
+    cliente.get("/api/painel", headers=ADMIN)
+    assert len(chamadas) == 2
 
 
 def test_cache_percebe_troca_da_ultima_linha(cliente):

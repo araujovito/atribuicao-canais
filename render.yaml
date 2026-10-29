@@ -1,7 +1,5 @@
 # Blueprint do Render: Dashboard → New → Blueprint → apontar para o repositório.
-# Plano gratuito: sem disco persistente, então o banco é recriado com dados
-# fictícios a cada reinício (ATRIBUICAO_GERAR_DEMO). Para guardar coleta de
-# verdade, use um plano com disco e aponte ATRIBUICAO_BANCO para ele.
+# Configure DATABASE_URL com a conexão do PostgreSQL no painel do serviço.
 services:
   - type: web
     name: atribuicao-canais
@@ -24,5 +22,5 @@ services:
         value: "1"
       - key: ATRIBUICAO_GERAR_DEMO
         value: "1"
-      - key: ATRIBUICAO_BANCO
-        value: /tmp/atribuicao.db
+      - key: DATABASE_URL
+        sync: false

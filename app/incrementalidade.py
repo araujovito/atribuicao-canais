@@ -11,7 +11,7 @@ responde isso com um grupo de controle sorteado:
 - compras incrementais = efeito × pessoas no tratamento: as compras que não
   teriam acontecido sem o anúncio.
 
-O intervalo de 95% usa a aproximação normal da diferença de proporções.
+O intervalo de 95% usa a combinação dos intervalos de Wilson (Newcombe).
 Intervalo que cruza o zero = o teste não distingue o efeito de nenhum
 efeito, com esse tamanho de amostra.
 
@@ -54,38 +54,66 @@ Z80 = 0.841621  # poder de 80%
 JANELA_DIAS = 30
 
 
+def _wilson(k: int, n: int) -> tuple[float, float]:
+    p = k / n
+    z2 = Z95 * Z95
+    centro = (p + z2 / (2 * n)) / (1 + z2 / n)
+    margem = Z95 * math.sqrt(p * (1 - p) / n + z2 / (4 * n * n)) / (1 + z2 / n)
+    return max(0.0, centro - margem), min(1.0, centro + margem)
+
+
 def analisar(con: sqlite3.Connection, agora: datetime | None = None, janela_dias: int = JANELA_DIAS) -> dict[str, dict]:
     mapa = mapa_aparelhos(con.execute("SELECT anon_id, pessoa_id FROM vinculos"))
-    compraram = {
-        resolver(r["anon_id"], r["pessoa_id"], mapa)
-        for r in con.execute("SELECT anon_id, pessoa_id FROM eventos WHERE tipo = 'conversao'")
-    }
-    grupos: dict[str, dict[str, set[str]]] = defaultdict(lambda: {"tratamento": set(), "controle": set()})
-    limite = tempo.texto((agora or tempo.agora()) - timedelta(days=janela_dias))
-    tratados_total: dict[str, set[str]] = defaultdict(set)
+    compras: dict[str, list[datetime]] = defaultdict(list)
+    for r in con.execute("SELECT anon_id, pessoa_id, momento FROM eventos WHERE tipo = 'conversao'"):
+        compras[resolver(r["anon_id"], r["pessoa_id"], mapa)].append(tempo.ler(r["momento"]))
+    grupos = defaultdict(lambda: {"tratamento": {}, "controle": {}})
+    instante = agora or tempo.agora()
+    limite = instante - timedelta(days=janela_dias)
     for r in con.execute("SELECT anon_id, canal, grupo, momento FROM experimentos"):
         unidade = resolver(r["anon_id"], None, mapa)
-        if r["grupo"] == "tratamento":
-            tratados_total[r["canal"]].add(unidade)
-        if r["momento"] <= limite:
-            grupos[r["canal"]][r["grupo"]].add(unidade)
+        inicio = tempo.ler(r["momento"])
+        grupo = grupos[r["canal"]][r["grupo"]]
+        grupo[unidade] = min(grupo.get(unidade, inicio), inicio)
 
     resultado = {}
     for canal, g in grupos.items():
-        n_t, n_c = len(g["tratamento"]), len(g["controle"])
+        # A unidade experimental precisa pertencer a um único grupo. Bases
+        # externas podem sortear dois aparelhos antes de eles serem ligados à
+        # mesma pessoa; nesse caso, excluímos a unidade contaminada dos dois
+        # braços e mostramos quantas foram afetadas.
+        contaminadas = g["tratamento"].keys() & g["controle"].keys()
+        tratados_total = len(g["tratamento"].keys() - contaminadas)
+        elegiveis = {grupo: {u: t for u, t in unidades.items() if u not in contaminadas and t <= limite}
+                     for grupo, unidades in g.items()}
+        n_t, n_c = len(elegiveis["tratamento"]), len(elegiveis["controle"])
         if not n_t or not n_c:
+            resultado[canal] = {"pessoas_tratamento": n_t, "pessoas_controle": n_c,
+                                "pessoas_contaminadas": len(contaminadas), "disponivel": False}
             continue
-        p_t = len(g["tratamento"] & compraram) / n_t
-        p_c = len(g["controle"] & compraram) / n_c
+        def contar(unidades: dict[str, datetime]) -> int:
+            return sum(any(inicio <= t <= inicio + timedelta(days=janela_dias) for t in compras[u])
+                       for u, inicio in unidades.items())
+
+        k_t, k_c = contar(elegiveis["tratamento"]), contar(elegiveis["controle"])
+        p_t, p_c = k_t / n_t, k_c / n_c
         efeito = p_t - p_c
-        erro = math.sqrt(p_t * (1 - p_t) / n_t + p_c * (1 - p_c) / n_c)
-        lo, hi = efeito - Z95 * erro, efeito + Z95 * erro
+        lt, ht = _wilson(k_t, n_t)
+        lc, hc = _wilson(k_c, n_c)
+        lo = efeito - math.hypot(p_t - lt, hc - p_c)
+        hi = efeito + math.hypot(ht - p_t, p_c - lc)
+        # Estimativa aproximada sob a hipótese nula, com suavização para
+        # não afirmar poder infinito quando não há eventos observados.
+        base = (k_t + k_c + 1) / (n_t + n_c + 2)
+        mde = min(1.0, (Z95 + Z80) * math.sqrt(base * (1 - base) * (1 / n_t + 1 / n_c)))
         resultado[canal] = {
+            "disponivel": True,
             "pessoas_tratamento": n_t,
             "pessoas_controle": n_c,
+            "pessoas_contaminadas": len(contaminadas),
             # Tratados sem o filtro da janela: é a população sobre a qual os
             # modelos de atribuição distribuem crédito, para comparar por pessoa.
-            "pessoas_tratamento_total": len(tratados_total[canal]),
+            "pessoas_tratamento_total": tratados_total,
             "taxa_tratamento": p_t,
             "taxa_controle": p_c,
             "efeito": efeito,
@@ -94,6 +122,6 @@ def analisar(con: sqlite3.Connection, agora: datetime | None = None, janela_dias
             "compras_incrementais_ic": [lo * n_t, hi * n_t],
             "significativo": lo > 0 or hi < 0,
             # Menor efeito que este tamanho de amostra detectaria 80% das vezes.
-            "efeito_minimo_detectavel": (Z95 + Z80) * erro,
+            "efeito_minimo_detectavel": mde,
         }
     return resultado

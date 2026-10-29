@@ -71,7 +71,8 @@ def pedir_exclusao(con: sqlite3.Connection, email: str, agora: datetime | None =
     codigo = f"{secrets.randbelow(10**6):06d}"
     expira = tempo.texto((agora or tempo.agora()) + timedelta(minutes=CODIGO_MINUTOS))
     with con:
-        con.execute("INSERT OR REPLACE INTO pedidos_exclusao VALUES (?, ?, ?, 0)",
+        con.execute("INSERT INTO pedidos_exclusao VALUES (?, ?, ?, 0) ON CONFLICT (pessoa_id) "
+                    "DO UPDATE SET codigo_hash = excluded.codigo_hash, expira = excluded.expira, tentativas = 0",
                     (pid, _hash_codigo(pid, codigo, chave_hmac), expira))
     return codigo
 

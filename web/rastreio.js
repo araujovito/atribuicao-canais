@@ -25,7 +25,10 @@
   var CHAVE_JUNCAO = "atrib_juncao";
   var CHAVE_ANON = "atrib_anon";
   var CHAVE_SESSAO = "atrib_sessao";
+  var CHAVE_VISITA = "atrib_visita_pendente";
   var API = (document.currentScript && document.currentScript.dataset.api) || "";
+  var visitaPendente = null;
+  var geracao = 0;
 
   function ler(chave, armazenamento) {
     try { return (armazenamento || localStorage).getItem(chave); } catch (e) { return null; }
@@ -57,10 +60,14 @@
 
   function visitaDeEntrada() {
     if (!consentiu() || ler(CHAVE_SESSAO, sessionStorage)) return Promise.resolve(null);
-    gravar(CHAVE_SESSAO, "1", sessionStorage);
+    if (visitaPendente) return visitaPendente;
+    var id = anonId(), versao = geracao;
     var q = new URLSearchParams(location.search);
-    return enviar("/api/evento", {
-      anon_id: anonId(),
+    var evento;
+    try { evento = JSON.parse(ler(CHAVE_VISITA, sessionStorage) || "null"); } catch (e) { evento = null; }
+    if (!evento || evento.anon_id !== id) evento = {
+      anon_id: id,
+      id_evento: novoId(),
       tipo: "visita",
       host: location.hostname,
       referrer: document.referrer || null,
@@ -68,7 +75,29 @@
       utm_medium: q.get("utm_medium"),
       utm_campaign: q.get("utm_campaign"),
       gclid: q.get("gclid"),
+    };
+    gravar(CHAVE_VISITA, JSON.stringify(evento), sessionStorage);
+    function tentar(numero) {
+      if (geracao !== versao || anonId() !== id) return Promise.resolve(null);
+      return enviar("/api/evento", evento).catch(function (erro) {
+        if (numero >= 3 || (typeof erro === "number" && erro < 500)) throw erro;
+        return new Promise(function (resolve) { setTimeout(resolve, numero * 500); })
+          .then(function () { return tentar(numero + 1); });
+      });
+    }
+    var pendente = tentar(1).then(function (resposta) {
+      // Só bloqueia novos envios depois de o servidor confirmar. Falha de
+      // rede continua elegível para nova tentativa nesta sessão.
+      if (resposta && geracao === versao && anonId() === id) {
+        gravar(CHAVE_SESSAO, "1", sessionStorage);
+        try { sessionStorage.removeItem(CHAVE_VISITA); } catch (e) { /* modo privado */ }
+      }
+      return resposta;
     });
+    visitaPendente = pendente;
+    pendente.then(function () { if (visitaPendente === pendente) visitaPendente = null; },
+      function () { if (visitaPendente === pendente) visitaPendente = null; });
+    return pendente;
   }
 
   var Rastreio = {
@@ -94,6 +123,8 @@
     },
 
     recusar: function () {
+      geracao++;
+      visitaPendente = null;
       gravar(CHAVE_CONSENT, "nao");
       return Promise.resolve();
     },
@@ -102,9 +133,12 @@
     // no servidor e esquece o identificador neste aparelho.
     revogar: function () {
       var id = ler(CHAVE_ANON);
+      geracao++;
+      visitaPendente = null;
       gravar(CHAVE_CONSENT, "nao");
       apagar(CHAVE_ANON);
       apagar(CHAVE_JUNCAO);
+      try { sessionStorage.removeItem(CHAVE_SESSAO); sessionStorage.removeItem(CHAVE_VISITA); } catch (e) { /* modo privado */ }
       if (!id) return Promise.resolve();
       return enviar("/api/consentimento", { anon_id: id, aceito: false, versao: VERSAO_TEXTO });
     },

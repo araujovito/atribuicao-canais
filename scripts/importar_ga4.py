@@ -28,7 +28,7 @@ Requisitos: Google Cloud SDK com `bq` e login feito (`gcloud auth login`);
 a consulta lê ~1,7 GB, cobrados do projeto informado (cota gratuita: 1 TB/mês).
 
 Uso:
-    python scripts/importar_ga4.py --projeto MEU-PROJETO            # 10% em dados/ga4.db
+    python scripts/importar_ga4.py --projeto MEU-PROJETO            # 10% no esquema ga4
     python scripts/importar_ga4.py --projeto MEU-PROJETO --percentual 25
 """
 
@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import csv
 import io
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -135,6 +136,20 @@ def converter(linhas: csv.DictReader) -> tuple[list[tuple], list[tuple], dict[st
 
 
 def gravar(caminho: Path, eventos: list[tuple], etapas: list[tuple]) -> None:
+    if str(caminho).startswith(("postgresql://", "postgres://")):
+        from app.postgres import Conexao
+        con = Conexao(str(caminho), schema="ga4")
+        try:
+            with con:
+                con.execute("DELETE FROM eventos")
+                con.execute("DELETE FROM etapas")
+                con.executemany("""INSERT INTO eventos (anon_id, pessoa_id, tipo, canal, utm_source, utm_medium,
+                    utm_campaign, referrer_host, aparelho, valor, momento) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", eventos)
+                con.executemany("INSERT INTO etapas (anon_id, etapa, momento) VALUES (?, ?, ?)", etapas)
+        finally:
+            con.close()
+        return
+    caminho = Path(caminho)
     caminho.parent.mkdir(parents=True, exist_ok=True)
     temporario = caminho.with_suffix(".tmp")
     temporario.unlink(missing_ok=True)
@@ -156,13 +171,13 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--projeto", required=True, help="projeto do Google Cloud que paga a consulta")
     ap.add_argument("--percentual", type=int, default=10, help="percentual de usuários na amostra (1 a 100)")
-    ap.add_argument("--destino", type=Path, default=DESTINO)
+    ap.add_argument("--destino", default=os.environ.get("DATABASE_URL", "postgresql://atribuicao:atribuicao@localhost:5432/atribuicao"))
     args = ap.parse_args()
     if not 1 <= args.percentual <= 100:
         raise SystemExit("--percentual vai de 1 a 100")
     eventos, etapas, stats = converter(csv.DictReader(io.StringIO(baixar(args.projeto, args.percentual))))
     gravar(args.destino, eventos, etapas)
-    print(f"{args.destino}: " + ", ".join(f"{k}={v}" for k, v in stats.items()))
+    print("Dados GA4 importados: " + ", ".join(f"{k}={v}" for k, v in stats.items()))
 
 
 if __name__ == "__main__":

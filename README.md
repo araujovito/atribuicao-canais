@@ -1,8 +1,8 @@
 # Atribuição de canais
 
-De onde vêm os clientes de um site e qual canal merece o crédito por cada
-venda, inclusive quando a pessoa clica no anúncio pelo celular e compra no
-computador, sem dado de terceiros e dentro da LGPD.
+De onde vêm os clientes de um site e qual canal recebe crédito por cada venda?
+Este projeto explora essa pergunta, inclusive quando uma pessoa começa a jornada
+no celular e compra no computador, com coleta e junção sujeitas a consentimento.
 
 O projeto implementa por dentro o que GA4, RD Station, Mixpanel e afins
 vendem prontos: coleta com consentimento por finalidade, classificação de
@@ -10,15 +10,34 @@ canais, junção de identidade entre aparelhos, sete modelos de atribuição com
 margem de erro, funil e um teste de incrementalidade que mede o que os
 modelos não medem: causa. Roda sobre dados fictícios, que têm verdade
 conhecida, e sobre dados reais da loja oficial do Google, publicados pelo
-próprio Google.
+próprio Google. É um protótipo de portfólio, não uma certificação de
+conformidade com a LGPD.
 
 ![Painel: indicadores, crédito com e sem junção entre aparelhos e matriz canal × modelo com a coluna da verdade](docs/painel.png)
+
+## Em destaque
+
+- **Problema:** comparar como canais de marketing participam de uma venda,
+  inclusive em jornadas com mais de um aparelho.
+- **Solução:** rastreador e API com consentimento, resolução de identidade,
+  painel de funil e sete modelos de atribuição.
+- **Análise:** intervalos por bootstrap e teste de incrementalidade com controle;
+  os dados sintéticos também permitem comparar os modelos com uma verdade conhecida.
+- **Tecnologias:** Python, FastAPI, PostgreSQL, HTML/CSS/JavaScript, Docker,
+  pytest e GitHub Actions. O importador opcional usa BigQuery.
+- **Limite importante:** crédito de atribuição descreve caminhos observados;
+  não demonstra, por si só, que um canal causou uma compra.
+
+Para conhecer o painel sem credenciais, abra `/demo` após iniciar a aplicação.
+Essa página usa uma amostra agregada e fictícia fixa, separada do banco da loja;
+o painel com dados coletados continua protegido por token.
 
 ## Rodar
 
 ```bash
+docker compose up -d postgres
 uv sync
-uv run python scripts/gerar_dados.py      # 2.000 pessoas fictícias em atribuicao.db
+uv run python scripts/gerar_dados.py      # somente em banco vazio: 2.000 pessoas fictícias
 uv run uvicorn app.main:app --reload
 ```
 
@@ -28,10 +47,10 @@ uv run uvicorn app.main:app --reload
 - Loja de demonstração: <http://localhost:8000/loja>. Abra no celular e no
   computador, aceite a junção, entre com o mesmo e-mail nos dois e compre em
   um deles.
-- Testes: `uv run pytest` (104 testes; o CI roda os mesmos a cada push).
+- Testes: `uv run pytest` e `node tests/test_rastreio.cjs` (o CI roda ambos a cada push).
 - Dados reais (opcional): com o Google Cloud SDK instalado e logado,
   `uv run python scripts/importar_ga4.py --projeto SEU-PROJETO` traz uma
-  amostra de 10% da base pública de GA4 do Google para `dados/ga4.db`
+  amostra de 10% da base pública de GA4 do Google para o esquema `ga4`
   (~1,7 GB lidos no BigQuery, dentro da cota gratuita). O painel ganha a
   opção "Google Merchandise Store" no seletor de dados.
 - Para o teste de incrementalidade ter poder estatístico, gere mais gente:
@@ -42,15 +61,41 @@ uv run uvicorn app.main:app --reload
 |---|---|---|
 | `ATRIBUICAO_CHAVE_HMAC` | chave da pseudonimização do e-mail | chave de desenvolvimento, com aviso |
 | `ATRIBUICAO_TOKEN_ADMIN` | token do painel e das rotas de manutenção | sorteado a cada subida e escrito no log |
-| `ATRIBUICAO_BANCO` | caminho do SQLite | `atribuicao.db` |
-| `ATRIBUICAO_BANCO_GA4` | banco importado do GA4 (aberto só para leitura) | `dados/ga4.db` |
+| `DATABASE_URL` | conexão PostgreSQL | `postgresql://atribuicao:atribuicao@localhost:5432/atribuicao` (somente desenvolvimento) |
+| `ATRIBUICAO_BANCO_GA4` | URL PostgreSQL alternativa para o esquema `ga4` | mesmo banco de `DATABASE_URL` |
 | `ATRIBUICAO_ORIGENS` | sites que podem hospedar o rastreador (CORS) | só o mesmo domínio |
 | `ATRIBUICAO_ATRAS_DE_PROXY` | `1` para ler o IP do `X-Forwarded-For` | desligado |
 | `ATRIBUICAO_REPLICAS` | réplicas do bootstrap | 100 |
 | `ATRIBUICAO_GERAR_DEMO` | `1` para gerar dados fictícios ao subir com o banco vazio | desligado |
 
-Publicação: `render.yaml` descreve o serviço para o Render (Blueprint), com os
-segredos sorteados pela própria plataforma.
+Publicação: `render.yaml` descreve o serviço para o Render. Configure `DATABASE_URL`
+com a conexão PostgreSQL fornecida pelo serviço de banco e use uma conexão segura.
+
+### Migrar bancos SQLite existentes
+
+Os arquivos originais não são alterados. Pare a aplicação e outros escritores,
+faça uma cópia de segurança consistente do SQLite (incluindo seu WAL quando
+existir) e configure `DATABASE_URL` para um PostgreSQL destinado à migração.
+Preserve também o valor original de `ATRIBUICAO_CHAVE_HMAC`: trocá-lo quebra
+os vínculos e a exclusão por e-mail.
+
+```bash
+uv run python -m scripts.migrar_sqlite atribuicao.db
+uv run python -m scripts.migrar_sqlite dados/ga4.db --esquema ga4  # opcional
+```
+
+Cada comando lê um snapshot e copia as tabelas numa transação. O destino deve
+estar vazio; caso contrário, o comando recusa a cópia. A contagem e o conteúdo
+das linhas são conferidos antes do commit, e os identificadores e sequências
+são preservados.
+Confira as contagens exibidas antes de iniciar o serviço: ao subir, a aplicação
+aplica a retenção padrão de 395 dias aos dados da fonte principal. O esquema
+`ga4` não passa por essa retenção e o painel o acessa em modo somente leitura.
+
+Para executar também os testes de integração PostgreSQL, configure
+`TEST_DATABASE_URL` para um servidor de teste cujo usuário possa criar bancos
+temporários e rode `uv run pytest`. Os testes criam e removem apenas os bancos
+temporários que eles próprios identificam.
 
 ## Como funciona
 
@@ -106,6 +151,11 @@ receita existentes.
 
 **Margem de erro.** Cada participação vem com intervalo de 95% por bootstrap,
 reamostrando pessoas (não jornadas, que não são independentes entre si).
+No experimento, o intervalo da diferença de taxas combina intervalos de Wilson;
+o efeito mínimo detectável é uma aproximação, não uma garantia de poder.
+Compras só contam dentro da janela após o sorteio, e pessoas atribuídas aos
+dois grupos são excluídas e informadas no painel. O cache do painel é renovado
+a cada minuto para refletir experimentos cuja janela acabou de fechar.
 
 **Privacidade.**
 - Consentimento separado por finalidade (medição; junção entre aparelhos),
@@ -193,10 +243,9 @@ e o teste de incrementalidade ficam de fora.
   sorteio (ghost ads). Aqui ele é simulado pelo gerador.
 - O limite por IP e o cache são por processo. Com várias instâncias, os dois
   vão para o Redis.
-- SQLite no protótipo. Em produção, seria Postgres ou um banco analítico atrás
-  de uma fila de eventos, com a coleta podendo ir para o RudderStack e a
-  análise para o PostHog, e a lógica de atribuição daqui por cima.
-- Os dados do GA4 ficam fora do repositório (`dados/` está no `.gitignore`):
+- PostgreSQL armazena a coleta e os dados importados. Em escala maior, uma
+  fila de eventos e um banco analítico podem complementar essa arquitetura.
+- Os dados do GA4 ficam fora do repositório:
   quem clona precisa rodar o importador com o próprio projeto do Google
   Cloud, e a versão publicada no Render mostra só os dados fictícios.
 - O e-mail com o código de exclusão vai para o log do servidor

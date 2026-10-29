@@ -117,7 +117,7 @@ def atribuir_regra(jornadas: list[Jornada], modelo: str) -> Resultado:
     for j in jornadas:
         if not j.converteu or not j.toques:
             continue
-        for (canal, _), peso in zip(j.toques, regra(j)):
+        for (canal, _), peso in zip(j.toques, regra(j), strict=True):
             conv[canal] += peso
             rec[canal] += peso * j.valor
     return Resultado(dict(conv), dict(rec))
@@ -148,7 +148,7 @@ def _transicoes(jornadas: list[Jornada], ordem: int = 1) -> dict[Estado, dict]:
         if not j.toques:
             continue
         estados = _estados_do_caminho(j.canais, ordem)
-        for de, para in zip(estados, estados[1:]):
+        for de, para in zip(estados, estados[1:], strict=False):
             contagem[de][para] += 1
         contagem[estados[-1]][CONVERSAO if j.converteu else NULO] += 1
     return {
@@ -188,7 +188,11 @@ def _prob_conversao(trans: dict[Estado, dict], removido: str | None = None) -> f
 
 
 def efeitos_remocao(jornadas: list[Jornada], ordem: int = 1) -> dict[str, float]:
-    """Queda relativa na probabilidade de conversão ao remover cada canal."""
+    """Queda relativa na conversão ao remover cada canal.
+
+    A remoção redireciona caminhos para o estado nulo e não pode aumentar a
+    conversão. O piso em zero protege contra pequenas imprecisões numéricas.
+    """
     trans = _transicoes(jornadas, ordem)
     if (INICIO,) not in trans:
         return {}
@@ -196,7 +200,10 @@ def efeitos_remocao(jornadas: list[Jornada], ordem: int = 1) -> dict[str, float]
     if base == 0:
         return {}
     canais = {c for j in jornadas for c in j.canais}
-    return {c: (base - _prob_conversao(trans, removido=c)) / base for c in sorted(canais)}
+    return {
+        c: max(0.0, (base - _prob_conversao(trans, removido=c)) / base)
+        for c in sorted(canais)
+    }
 
 
 def atribuir_markov(jornadas: list[Jornada], ordem: int = 1) -> Resultado:

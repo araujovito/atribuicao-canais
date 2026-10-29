@@ -10,6 +10,20 @@ jobs:
   testes:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: atribuicao
+          POSTGRES_PASSWORD: atribuicao
+          POSTGRES_DB: atribuicao
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U atribuicao"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -23,7 +37,14 @@ jobs:
       - name: Testes
         env:
           ATRIBUICAO_CHAVE_HMAC: chave-do-ci
+          TEST_DATABASE_URL: postgresql://atribuicao:atribuicao@localhost:5432/atribuicao
         run: uv run pytest -q
+
+      - name: Qualidade do Python
+        run: uv run ruff check app scripts tests
 
       - name: Sintaxe do JavaScript do navegador
         run: node --check web/rastreio.js
+
+      - name: Comportamento do rastreador
+        run: node tests/test_rastreio.cjs

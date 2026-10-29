@@ -24,8 +24,8 @@ de controle sem o anúncio).
 - Alguns computadores são compartilhados por duas pessoas (casa de família).
 
 Uso:
-    python scripts/gerar_dados.py                 # 2.000 pessoas em atribuicao.db
-    python scripts/gerar_dados.py --pessoas 500 --banco outro.db
+    python scripts/gerar_dados.py                 # 2.000 pessoas no PostgreSQL
+    python scripts/gerar_dados.py --pessoas 500
     python scripts/gerar_dados.py --substituir    # apaga o que houver e gera de novo
 """
 
@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import argparse
 import itertools
+import os
 import random
 import sys
 import uuid
@@ -126,10 +127,11 @@ def gerar(caminho: Path, n_pessoas: int, semente: int, hoje: datetime, substitui
     con = conectar(caminho)
     # O gerador começa apagando tudo. Num banco que já recebeu coleta da loja
     # (ou de um site de verdade), isso perderia dado sem volta.
-    existentes = con.execute("SELECT COUNT(*) FROM eventos").fetchone()[0]
+    existentes = sum(con.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
+                     for t in ("eventos", "vinculos", "consentimentos", "etapas", "experimentos", "verdade"))
     if existentes and not substituir:
         con.close()
-        raise BancoComDados(f"{caminho} já tem {existentes} eventos; use --substituir para apagar e gerar de novo")
+        raise BancoComDados(f"O banco já tem {existentes} registros; use --substituir para apagar e gerar de novo")
     with con:
         for tabela in ("eventos", "vinculos", "consentimentos", "etapas", "experimentos", "verdade"):
             con.execute(f"DELETE FROM {tabela}")
@@ -241,14 +243,14 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--pessoas", type=int, default=2000)
     ap.add_argument("--semente", type=int, default=42)
-    ap.add_argument("--banco", type=Path, default=Path(__file__).resolve().parent.parent / "atribuicao.db")
+    ap.add_argument("--banco", default=os.environ.get("DATABASE_URL", "postgresql://atribuicao:atribuicao@localhost:5432/atribuicao"))
     ap.add_argument("--substituir", action="store_true", help="apaga os dados que já existirem no banco")
     args = ap.parse_args()
     try:
         stats = gerar(args.banco, args.pessoas, args.semente, agora(), args.substituir)
     except BancoComDados as e:
         raise SystemExit(f"Nada foi alterado: {e}") from None
-    print(f"{args.banco}: " + ", ".join(f"{k}={v}" for k, v in stats.items()))
+    print("Dados gerados: " + ", ".join(f"{k}={v}" for k, v in stats.items()))
 
 
 if __name__ == "__main__":

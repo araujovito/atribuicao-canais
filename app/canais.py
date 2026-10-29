@@ -54,10 +54,14 @@ CANAIS = (
 DESCONHECIDOS = {"<other>", "(data deleted)", "(not set)", "(not provided)"}
 
 
-def _host(url: str | None) -> str:
+def host_da_url(url: str | None) -> str:
+    """Extrai um host normalizado sem deixar uma URL inválida derrubar a API."""
     if not url:
         return ""
-    host = urlparse(url if "//" in url else f"//{url}").hostname or ""
+    try:
+        host = urlparse(url if "//" in url else f"//{url}").hostname or ""
+    except ValueError:
+        return ""
     return host.lower().removeprefix("www.")
 
 
@@ -128,7 +132,7 @@ def classificar(
     if gclid:
         return "Busca paga"
 
-    host = _host(referrer)
+    host = host_da_url(referrer)
     if not host:
         return "Direto"
     if host_proprio and (host == host_proprio or host.endswith(f".{host_proprio}")):

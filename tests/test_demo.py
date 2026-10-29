@@ -4,6 +4,7 @@ import sys
 
 CODIGO = r"""
 import os, tempfile, pathlib
+os.environ.pop("DATABASE_URL", None)
 os.environ["ATRIBUICAO_BANCO"] = str(pathlib.Path(tempfile.mkdtemp()) / "d.db")
 os.environ["ATRIBUICAO_GERAR_DEMO"] = "1"
 os.environ["ATRIBUICAO_PESSOAS_DEMO"] = "100"

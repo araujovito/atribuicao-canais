@@ -6,6 +6,7 @@ import sys
 # contaminar o app dos outros testes.
 CODIGO = r"""
 import os, tempfile, pathlib
+os.environ.pop("DATABASE_URL", None)
 os.environ["ATRIBUICAO_BANCO"] = str(pathlib.Path(tempfile.mkdtemp()) / "c.db")
 os.environ["ATRIBUICAO_ORIGENS"] = "https://loja.exemplo, *"
 os.environ["ATRIBUICAO_CHAVE_HMAC"] = "x"

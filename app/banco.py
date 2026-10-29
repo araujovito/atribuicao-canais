@@ -1,4 +1,4 @@
-"""Esquema SQLite do protótipo.
+"""Conexões PostgreSQL e compatibilidade com arquivos SQLite legados.
 
 Minimização (LGPD art. 6º, III) decidida no esquema, não na boa vontade de
 quem consulta:
@@ -8,8 +8,8 @@ quem consulta:
 - do navegador guarda-se só a classe do aparelho (celular/computador), não o
   User-Agent inteiro, e IP não é gravado.
 
-Em produção isto seria Postgres ou um banco analítico atrás de uma fila de
-eventos; para demonstrar a lógica, SQLite basta e roda sem servidor.
+O esquema PostgreSQL está em app/postgres.py. O SQLite é mantido para leitura
+e testes de compatibilidade de bases antigas e do migrador.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from pathlib import Path
 ESQUEMA = """
 CREATE TABLE IF NOT EXISTS eventos (
     id            INTEGER PRIMARY KEY,
+    id_evento     TEXT,
     anon_id       TEXT NOT NULL,
     pessoa_id     TEXT,
     tipo          TEXT NOT NULL CHECK (tipo IN ('visita', 'conversao')),
@@ -122,6 +123,11 @@ def conectar_leitura(caminho: str | Path) -> sqlite3.Connection:
     públicos de 2020 seriam apagados pelo prazo de 13 meses na primeira
     subida do servidor.
     """
+    if str(caminho).startswith(("postgresql://", "postgres://")):
+        from app.postgres import Conexao
+        con = Conexao(str(caminho), schema="ga4", criar=False)
+        con.raw.execute("SET default_transaction_read_only = on")
+        return con
     con = sqlite3.connect(f"file:{Path(caminho).resolve()}?mode=ro", uri=True, timeout=5, check_same_thread=False)
     con.row_factory = sqlite3.Row
     return con
@@ -138,6 +144,9 @@ def conectar(caminho: str | Path, criar: bool = True) -> sqlite3.Connection:
     numa thread do pool e roda a rota em outra, e a checagem padrão do
     sqlite3 recusaria isso.
     """
+    if str(caminho).startswith(("postgresql://", "postgres://")):
+        from app.postgres import Conexao
+        return Conexao(str(caminho), criar=criar)
     con = sqlite3.connect(caminho, timeout=5, check_same_thread=False)
     con.row_factory = sqlite3.Row
     if str(caminho) != ":memory:":
@@ -155,3 +164,7 @@ def _migrar(con: sqlite3.Connection) -> None:
         # Consentimento antigo (v1) era uma autorização só; não vale para a
         # junção, que agora é finalidade separada: entra como 0.
         con.execute("ALTER TABLE consentimentos ADD COLUMN juncao INTEGER NOT NULL DEFAULT 0")
+    colunas_eventos = {r["name"] for r in con.execute("PRAGMA table_info(eventos)")}
+    if "id_evento" not in colunas_eventos:
+        con.execute("ALTER TABLE eventos ADD COLUMN id_evento TEXT")
+    con.execute("CREATE UNIQUE INDEX IF NOT EXISTS eventos_idempotencia ON eventos (anon_id, id_evento)")

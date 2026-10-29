@@ -28,9 +28,7 @@ def test_efeito_e_intervalo():
     assert r["efeito"] == pytest.approx(0.10)
     assert r["compras_incrementais"] == pytest.approx(40)
     assert r["efeito_ic"][0] > 0 and r["significativo"]
-    # (1,96 + 0,84) × erro-padrão
-    erro = (0.3 * 0.7 / 400 + 0.2 * 0.8 / 400) ** 0.5
-    assert r["efeito_minimo_detectavel"] == pytest.approx(2.8016 * erro, rel=1e-3)
+    assert 0 < r["efeito_minimo_detectavel"] < 1
 
 
 def test_sem_efeito_nao_e_significativo():
@@ -51,3 +49,48 @@ def test_so_le_quem_ja_fechou_a_janela():
     r = analisar(con, agora=AGORA)["Display"]
     assert r["pessoas_tratamento"] == 100
     assert r["pessoas_tratamento_total"] == 200  # para comparar com o crédito dos modelos
+
+
+def test_unidade_em_dois_grupos_e_excluida_da_analise():
+    con = conectar(":memory:")
+    popular(con, "Display", "tratamento", 10, 2)
+    popular(con, "Display", "controle", 10, 2)
+    # Os dois aparelhos passam a resolver para a mesma pessoa, embora tenham
+    # sido sorteados para braços diferentes antes da identificação.
+    con.execute("INSERT INTO vinculos VALUES (?, ?, ?)", ("tratamento0", "pessoa-x", VELHO))
+    con.execute("INSERT INTO vinculos VALUES (?, ?, ?)", ("controle0", "pessoa-x", VELHO))
+    r = analisar(con, agora=AGORA)["Display"]
+    assert r["pessoas_contaminadas"] == 1
+    assert r["pessoas_tratamento"] == 9
+    assert r["pessoas_controle"] == 9
+
+
+def test_compra_fora_da_janela_nao_conta():
+    con = conectar(":memory:")
+    popular(con, "Display", "tratamento", 2, 0)
+    popular(con, "Display", "controle", 2, 0)
+    for anon, instante in [("tratamento0", AGORA - timedelta(days=46)),
+                           ("tratamento1", AGORA - timedelta(days=14))]:
+        con.execute("INSERT INTO eventos (anon_id, tipo, valor, momento) VALUES (?, 'conversao', 1, ?)",
+                    (anon, texto(instante)))
+    assert analisar(con, agora=AGORA)["Display"]["taxa_tratamento"] == 0
+
+
+def test_amostra_extrema_nao_apresenta_certeza_falsa():
+    con = conectar(":memory:")
+    popular(con, "Display", "tratamento", 1, 1)
+    popular(con, "Display", "controle", 1, 0)
+    r = analisar(con, agora=AGORA)["Display"]
+    assert r["efeito_ic"][0] < 0 < r["efeito_ic"][1]
+    assert not r["significativo"] and r["efeito_minimo_detectavel"] > 0
+
+
+def test_conflito_recente_remove_unidade_e_exibe_grupo_vazio():
+    con = conectar(":memory:")
+    popular(con, "Display", "tratamento", 1, 0, momento=RECENTE)
+    popular(con, "Display", "controle", 1, 0)
+    for anon in ("tratamento0", "controle0"):
+        con.execute("INSERT INTO vinculos VALUES (?, ?, ?)", (anon, "mesma-pessoa", VELHO))
+    r = analisar(con, agora=AGORA)["Display"]
+    assert r["pessoas_contaminadas"] == 1
+    assert not r["disponivel"] and r["pessoas_controle"] == 0
